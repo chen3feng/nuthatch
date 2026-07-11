@@ -28,6 +28,7 @@ std::unique_ptr<ExpertReader> ExpertReader::Open(const std::string& gguf_path) {
     in.file_offset = data_off + gguf_get_tensor_offset(g, id);
     in.expert_bytes = t->nb[2];  // dim2 一步的字节 = 一个专家的量化数据大小
     in.n_experts = static_cast<int>(t->ne[2]);
+    in.type = static_cast<int32_t>(t->type);
     info[name] = in;
   }
   gguf_free(g);
@@ -53,6 +54,11 @@ size_t ExpertReader::ExpertBytes(const std::string& name) const {
 int ExpertReader::NumExperts(const std::string& name) const {
   auto it = info_.find(name);
   return it == info_.end() ? 0 : it->second.n_experts;
+}
+
+int32_t ExpertReader::ExpertType(const std::string& name) const {
+  auto it = info_.find(name);
+  return it == info_.end() ? -1 : it->second.type;
 }
 
 bool ExpertReader::ReadExpert(const std::string& name, int expert_idx,
