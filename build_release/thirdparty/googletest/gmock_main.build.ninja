@@ -1,0 +1,6 @@
+#Fingerprint=98d870f6eea5f049286a19302dd36804
+
+build build_release/thirdparty/googletest/gmock_main.incchk.result: ccincchk build_release/thirdparty/googletest/gmock_main.incchk
+
+build build_release/thirdparty/googletest/gmock_main.__outputs__: phony build_release/thirdparty/googletest/gmock_main.incchk.result
+

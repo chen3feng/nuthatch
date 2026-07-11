@@ -1,0 +1,6 @@
+#Fingerprint=5e2d993cef721d6b49aac244c6b2e071
+
+build /Volumes/code/personal/nuthatch/build_release/.cache/vcpkg/installed/blade-arm64-osx/lib/libgmock_main.a.syms: ccsyms /Volumes/code/personal/nuthatch/build_release/.cache/vcpkg/installed/blade-arm64-osx/lib/libgmock_main.a
+
+build build_release/vcpkg#gtest/gmock_main.__outputs__: phony /Volumes/code/personal/nuthatch/build_release/.cache/vcpkg/installed/blade-arm64-osx/lib/libgmock_main.a /Volumes/code/personal/nuthatch/build_release/.cache/vcpkg/installed/blade-arm64-osx/lib/libgmock_main.a.syms
+

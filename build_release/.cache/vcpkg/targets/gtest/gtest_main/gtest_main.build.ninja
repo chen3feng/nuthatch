@@ -1,0 +1,6 @@
+#Fingerprint=83c595606f8400cd61b3b3a9b4c4490a
+
+build /Volumes/code/personal/nuthatch/build_release/.cache/vcpkg/installed/blade-arm64-osx/lib/libgtest_main.a.syms: ccsyms /Volumes/code/personal/nuthatch/build_release/.cache/vcpkg/installed/blade-arm64-osx/lib/libgtest_main.a
+
+build build_release/vcpkg#gtest/gtest_main.__outputs__: phony /Volumes/code/personal/nuthatch/build_release/.cache/vcpkg/installed/blade-arm64-osx/lib/libgtest_main.a /Volumes/code/personal/nuthatch/build_release/.cache/vcpkg/installed/blade-arm64-osx/lib/libgtest_main.a.syms
+
