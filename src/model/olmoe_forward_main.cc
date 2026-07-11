@@ -39,7 +39,7 @@ int main(int argc, char** argv) {
   ggml_tensor* ids = ggml_new_tensor_1d(ctx, GGML_TYPE_I32, T);
   ggml_tensor* pos = ggml_new_tensor_1d(ctx, GGML_TYPE_I32, T);
   ggml_tensor* logits =
-      nuthatch::BuildForward(ctx, *model, ids, pos, /*norm_topk=*/true);
+      nuthatch::BuildForward(ctx, *model, ids, pos, /*norm_topk=*/false);
   ggml_cgraph* gf = ggml_new_graph(ctx);
   ggml_build_forward_expand(gf, logits);
 

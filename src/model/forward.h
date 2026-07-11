@@ -13,7 +13,8 @@ namespace nuthatch {
 //   model      : 已加载的权重(其 ctx 里的量化张量,mul_mat/get_rows 原生支持)。
 //   token_ids  : [T] int32 输入 token id。
 //   pos        : [T] int32 位置(RoPE 用)。
-//   norm_topk  : MoE top-k 权重是否归一(OLMoE 精确取值见 forward 里的注释/对拍)。
+//   norm_topk  : MoE top-k 权重是否归一。【OLMoE 用 false】——对拍 llama.cpp
+//                确认:true 时首 token 分歧(called vs Paris),false 时 token-exact。
 //
 // 数值正确性由整图对拍 llama.cpp 验证(本层 CI 测只保证结构/形状/因果)。
 ggml_tensor* BuildForward(ggml_context* ctx, const OlmoeModel& model,
