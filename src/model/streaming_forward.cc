@@ -1,6 +1,7 @@
 #include "src/model/streaming_forward.h"
 
 #include <cmath>     // INFINITY
+#include <cstdlib>   // malloc/free
 #include <cstring>   // std::memcpy
 #include <memory>
 #include <unordered_map>
@@ -18,18 +19,36 @@ namespace {
 // 小图统一用这个内存上限(逐 token、活值极小;final 的 logits 另加)。
 constexpr size_t kGraphMem = 64u * 1024 * 1024;
 
+// 复用同一块 compute 缓冲:每 token 有 34 趟小图,原来每趟 ggml_init 都 malloc
+// 一块 64MB、用完 free——纯浪费。各小图顺序执行、用完即 ggml_free,故可共用一块;
+// ggml 用外部 buffer 时不接管其释放,我们自己在进程/线程退出时归还。
+struct Scratch {
+  void* buf = nullptr;
+  size_t size = 0;
+  ~Scratch() { std::free(buf); }
+};
+thread_local Scratch g_scratch;
+
 ggml_context* NewCtx(size_t extra = 0) {
-  ggml_init_params ip = {kGraphMem + extra, nullptr, /*no_alloc=*/false};
+  const size_t need = kGraphMem + extra;
+  if (g_scratch.size < need) {
+    std::free(g_scratch.buf);
+    g_scratch.buf = std::malloc(need);
+    g_scratch.size = need;
+  }
+  ggml_init_params ip = {g_scratch.size, g_scratch.buf, /*no_alloc=*/false};
   return ggml_init(ip);
 }
 
-// 算出 out 并把它读成 host float 向量(out 必须是 f32)。
+// 算出 out 并把它读成 host float 向量(out 必须是 f32)。n_threads:T=1 的极小图
+// 用 1(免线程池 spin);只有末端 lm_head(n_vocab×n_embd 大乘)值得多线程。
 std::vector<float> Compute1(ggml_context* ctx, ggml_tensor* out,
-                            const std::vector<ggml_tensor*>& also) {
+                            const std::vector<ggml_tensor*>& also,
+                            int n_threads) {
   ggml_cgraph* gf = ggml_new_graph(ctx);
   ggml_build_forward_expand(gf, out);
   for (ggml_tensor* a : also) ggml_build_forward_expand(gf, a);
-  ggml_graph_compute_with_ctx(ctx, gf, /*n_threads=*/4);
+  ggml_graph_compute_with_ctx(ctx, gf, n_threads);
   std::vector<float> v(ggml_nelements(out));
   std::memcpy(v.data(), out->data, v.size() * sizeof(float));
   return v;
@@ -41,7 +60,7 @@ std::vector<float> Embed(const StreamingModel& m, int32_t token) {
   ggml_tensor* tid = ggml_new_tensor_1d(ctx, GGML_TYPE_I32, 1);
   static_cast<int32_t*>(tid->data)[0] = token;
   ggml_tensor* h = ggml_get_rows(ctx, m.tensor("token_embd.weight"), tid);
-  std::vector<float> out = Compute1(ctx, h, {});
+  std::vector<float> out = Compute1(ctx, h, {}, /*n_threads=*/1);
   ggml_free(ctx);
   return out;
 }
@@ -103,7 +122,7 @@ PhaseA RunPhaseA(const StreamingModel& m, KvCache* kv, int l,
   ggml_build_forward_expand(gf, weights);
   ggml_build_forward_expand(gf, selected);
   for (ggml_tensor* cw : cache_writes) ggml_build_forward_expand(gf, cw);
-  ggml_graph_compute_with_ctx(ctx, gf, 4);
+  ggml_graph_compute_with_ctx(ctx, gf, /*n_threads=*/1);
 
   PhaseA r;
   r.h_mid.resize(n_embd);
@@ -152,7 +171,7 @@ std::vector<float> RunPhaseB(const StreamingModel& m, int l,
   if (n_used == 1) moe = ggml_cont(ctx, moe);
   ggml_tensor* h_next = ggml_add(ctx, h_mid, moe);
 
-  std::vector<float> out = Compute1(ctx, h_next, {});
+  std::vector<float> out = Compute1(ctx, h_next, {}, /*n_threads=*/1);
   ggml_free(ctx);
   return out;
 }
@@ -168,7 +187,7 @@ std::vector<float> RunFinal(const StreamingModel& m,
   ggml_tensor* x = ggml_mul(ctx, ggml_rms_norm(ctx, h, cfg.rms_eps),
                             m.tensor("output_norm.weight"));
   ggml_tensor* logits = ggml_mul_mat(ctx, m.tensor("output.weight"), x);
-  std::vector<float> out = Compute1(ctx, logits, {});
+  std::vector<float> out = Compute1(ctx, logits, {}, /*n_threads=*/4);
   ggml_free(ctx);
   return out;
 }
