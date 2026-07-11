@@ -42,3 +42,26 @@ cc_test(
         '//src/trace:routing_trace',
     ],
 )
+
+cc_library(
+    name = 'learned_pin_policy',
+    srcs = ['learned_pin_policy.cc'],
+    hdrs = ['learned_pin_policy.h'],
+    deps = [
+        ':cache_policy',
+        '//src/trace:routing_trace',
+    ],
+    visibility = ['PUBLIC'],
+)
+
+cc_test(
+    name = 'learned_pin_policy_test',
+    srcs = ['learned_pin_policy_test.cc'],
+    deps = [
+        ':learned_pin_policy',
+        ':cache_policy',
+        ':lru_policy',                # 对比基线
+        ':os_page_cache_policy',      # 对比基线
+        '//src/trace:routing_trace',
+    ],
+)
