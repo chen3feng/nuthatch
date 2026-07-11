@@ -150,6 +150,27 @@
 - 待办(可选工程):物理显存受限执行(真在槽上 mul_mat_id,省内存);更多 prompt/
   更长序列的稳健性;pin/lru 配比与 budget 的完整曲线。
 
+### 2026-07-11 — ★ budget 曲线 + 跨领域稳健:预算越紧 learned 优势越大(P22)
+
+- 方法:`olmoe_trace` 对 3 个不同领域 prompt 各生成 64-decode trace(story/fact/code),
+  `trace_replay`(model-free)扫每层预算 4→32、比三策略命中率。
+- learned − LRU 优势(百分点):
+
+  | 预算/层 (占 64) | story | fact | code |
+  |---|---|---|---|
+  | 4  (6%)  | +17.5 | +15.5 | **+24.2** |
+  | 8  (12%) | +9.1  | +9.4  | +15.7 |
+  | 16 (25%) | +6.4  | +8.4  | +10.6 |
+  | 32 (50%) | +8.1  | +11.4 | +7.9  |
+
+- ★ 关键发现:**预算越紧,learned 优势越大**。budget=4 时 OS 全局页缓存 **0% 命中**
+  (64 槽全局池彻底 thrash)、per-layer LRU 也仅 3–5%,而 learned pin 住热专家仍
+  **20–29%**。即"内存越受限(正是流式最该用的场景),朴素缓存越崩,学习缓存越值"。
+- 稳健性:learned 在 story/fact/code 三领域、全预算档**始终为正**优势(+6~+24pp)。
+  code 生成专家复用更强(绝对命中率最高、小预算优势最大 +24pp)。
+- 复现:`olmoe_trace <model> 64 16 <prompt>` 存 trace(NUTHATCH_TRACE_OUT),再
+  `trace_replay <trace> 4 8 12 16 20 24 28 32`。
+
 ---
 
 ## 数据点追加模板
