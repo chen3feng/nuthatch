@@ -58,6 +58,24 @@ cc_test(
     ],
 )
 
+# 专家流式读取器:按 (张量名, expert_idx) 从 GGUF pread 出单个专家的量化字节。
+cc_library(
+    name = 'expert_reader',
+    srcs = ['expert_reader.cc'],
+    hdrs = ['expert_reader.h'],
+    deps = ['//thirdparty/ggml:ggml'],  # gguf 偏移/形状 + ggml 张量 nb/ne
+    visibility = ['PUBLIC'],
+)
+
+cc_test(
+    name = 'expert_reader_test',
+    srcs = ['expert_reader_test.cc'],
+    deps = [
+        ':expert_reader',
+        '//thirdparty/ggml:ggml',
+    ],
+)
+
 # 单序列 KV cache:每层常驻 K/V 缓存张量,跨 decode 步存活。
 cc_library(
     name = 'kv_cache',
