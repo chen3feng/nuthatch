@@ -1,7 +1,10 @@
 title: nuthatch 源码分析
 description: nuthatch 源码深度分析——从零写一个流式 MoE 推理引擎,验证"学习式专家缓存"假设
 remote_theme: just-the-docs/just-the-docs
-url: https://chen3feng.github.io/nuthatch
+plugins:
+  - jekyll-remote-theme
+# baseurl 由 Actions 的 configure-pages 注入(项目页在 /nuthatch 下);url 仅作绝对链接前缀。
+url: https://chen3feng.github.io
 
 # Navigation
 nav_enabled: true
