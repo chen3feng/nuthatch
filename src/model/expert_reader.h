@@ -29,6 +29,9 @@ class ExpertReader {
   size_t ExpertBytes(const std::string& tensor_name) const;
   // 专家数(= ne[2]);张量不存在返回 0。
   int NumExperts(const std::string& tensor_name) const;
+  // 元素类型(ggml_type,as int;量化如 Q4_K);张量不存在返回 -1。
+  // 建槽缓存张量时要按同类型分配,量化字节才能直接喂 mul_mat。
+  int32_t ExpertType(const std::string& tensor_name) const;
 
   // 把 tensor_name 的第 expert_idx 个专家的量化字节读进 out(须 ≥ ExpertBytes)。
   // 成功返回 true;out 内容可直接作为 ggml 量化数据喂 mul_mat。
@@ -40,6 +43,7 @@ class ExpertReader {
     uint64_t file_offset;  // 文件内该张量数据起点(data_offset + tensor_offset)
     size_t expert_bytes;   // 一个专家的字节数(nb[2])
     int n_experts;         // ne[2]
+    int32_t type;          // 元素类型(ggml_type as int)
   };
   ExpertReader(int fd, std::unordered_map<std::string, Info> info);
 

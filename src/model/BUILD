@@ -76,6 +76,30 @@ cc_test(
     ],
 )
 
+# 有界专家槽缓存:每层 C 个槽,miss 从 reader 读入 gate/up/down,LRU 淘汰。
+cc_library(
+    name = 'expert_slot_cache',
+    srcs = ['expert_slot_cache.cc'],
+    hdrs = ['expert_slot_cache.h'],
+    deps = [
+        ':expert_reader',
+        ':olmoe_model',            # OlmoeConfig
+        '//thirdparty/ggml:ggml',
+    ],
+    visibility = ['PUBLIC'],
+)
+
+cc_test(
+    name = 'expert_slot_cache_test',
+    srcs = ['expert_slot_cache_test.cc'],
+    deps = [
+        ':expert_slot_cache',
+        ':expert_reader',
+        ':olmoe_model',
+        '//thirdparty/ggml:ggml',
+    ],
+)
+
 # 单序列 KV cache:每层常驻 K/V 缓存张量,跨 decode 步存活。
 cc_library(
     name = 'kv_cache',
