@@ -27,5 +27,6 @@ vcpkg_config(
     baseline = '06a7fdd564234908731c59ac46a624f808e87b1c',
     packages = {
         'gtest': {'version': '1.17.0'},
+        'ggml': {'version': '0.11.1'},   # baseline 已含此版本,无需 bump;metal/cuda/vulkan 等 feature 留到 M4
     },
 )
