@@ -171,6 +171,25 @@
 - 复现:`olmoe_trace <model> 64 16 <prompt>` 存 trace(NUTHATCH_TRACE_OUT),再
   `trace_replay <trace> 4 8 12 16 20 24 28 32`。
 
+### 2026-07-11 — ★ 物理流式执行:OLMoE 在 1.2GB 而非 3GB 里跑,token-exact(P24)
+
+- 机器/模型:M4 Pro;OLMoE-1B-7B Instruct Q4_K_M。
+- 做法:StreamingModel 只常驻非专家权重;推理时逐 token 两段式(段A 路由→装槽
+  [miss 真 pread]→段B 在槽上 mul_mat_id),每层有界槽缓存 capacity 个专家。
+- 命令:`olmoe_stream <model> 12 16 The capital of France is`。
+- 结果(峰值常驻内存 maximum RSS):
+
+  | 路径 | 输出 | 峰值 RSS |
+  |---|---|---|
+  | 流式 capacity=16/层 | "…France is Paris." | **1203 MB** |
+  | 常驻 olmoe_generate  | "…France is Paris." | 2975 MB |
+
+- 结论:同一模型、**token-exact 同样输出**,流式常驻内存降到 ~40%(≈2.5×)。
+  1.2GB ≈ 250MB 非专家 + 16 层×16 槽×~3MB 专家。capacity 越小越省(与命中率权衡,
+  见 P22 曲线)。**至此 nuthatch 是真正的流式 MoE 引擎,非模拟器。**
+- 代价:流式慢于常驻(逐 token 多趟小图 + miss 磁盘读);速度非本阶段目标。
+- 正确性锚点:UT StreamingMatchesResident(流式==GreedyGenerateCached 逐 token 一致)。
+
 ---
 
 ## 数据点追加模板
