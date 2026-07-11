@@ -19,6 +19,7 @@
 | numpy | 数值/trace 分析 | BSD | #10 起 | 提议 |
 | matplotlib | 画命中率曲线等研究图 | PSF/BSD | #10 起 | 提议 |
 | huggingface_hub | 下载模型/fixture(也可直接用 llama.cpp `-hf` 或手动) | Apache-2 | #7/#13 | 提议(可选) |
+| gguf | 离线探查 GGUF 元数据/张量(装 OLMoE 架构时用) | MIT | 工具 | ✅ 已同意(用户批准) |
 
 ## 系统/平台(随 ggml 构建,非独立库,不单独 vet)
 
