@@ -1,12 +1,10 @@
 #include "src/model/streaming_model.h"
 
-#include <fcntl.h>
-#include <unistd.h>
-
 #include <cstring>
 #include <utility>
 
 #include "gguf.h"
+#include "src/io/tensor_source.h"
 
 namespace nuthatch {
 namespace {
@@ -41,8 +39,8 @@ std::unique_ptr<StreamingModel> StreamingModel::Load(const std::string& path) {
   ggml_init_params rip = {mem, nullptr, /*no_alloc=*/false};
   ggml_context* rctx = ggml_init(rip);
 
-  const int fd = open(path.c_str(), O_RDONLY);
-  if (fd < 0) {
+  auto src = TensorSource::Open(path);  // 跨平台定位读
+  if (src == nullptr) {
     ggml_free(rctx);
     ggml_free(meta);
     gguf_free(g);
@@ -50,7 +48,7 @@ std::unique_ptr<StreamingModel> StreamingModel::Load(const std::string& path) {
   }
   const uint64_t data_off = gguf_get_data_offset(g);
 
-  // 逐个非专家张量:在常驻 ctx 建同形张量并从文件 pread 其数据。
+  // 逐个非专家张量:在常驻 ctx 建同形张量并从文件定位读其数据。
   std::unordered_map<std::string, ggml_tensor*> tensors;
   bool ok = true;
   for (ggml_tensor* t = ggml_get_first_tensor(meta); t != nullptr && ok;
@@ -63,14 +61,12 @@ std::unique_ptr<StreamingModel> StreamingModel::Load(const std::string& path) {
     const int64_t id = gguf_find_tensor(g, name);
     const uint64_t off = data_off + gguf_get_tensor_offset(g, id);
     const size_t nb = ggml_nbytes(r);
-    if (pread(fd, r->data, nb, static_cast<off_t>(off)) !=
-        static_cast<ssize_t>(nb)) {
+    if (!src->ReadAt(off, nb, r->data)) {
       ok = false;
       break;
     }
     tensors[name] = r;
   }
-  close(fd);
   ggml_free(meta);
   gguf_free(g);
 
