@@ -202,6 +202,18 @@
   因而偏乐观。真实部署应从一次校准跑建直方图、用到**新输入**——那时 LRU 兜分布漂移
   会更有价值。"跨输入迁移"(prior 从 A 建、用到 B)是更严谨的后续问题。
 
+### 2026-07-11 — 流式提速 2×:复用 compute buffer + 小图单线程(P28)
+
+- 现象:流式每 token 有 ~34 趟小图(embed + 16 层×2 段 + final),原来每趟都
+  ① ggml_init 新 malloc 一块 64MB compute buffer、② 以 4 线程 compute。T=1 的图
+  极小,这两项都是纯开销(malloc churn + 578 次线程池 spin)。
+- 改法:① 复用一块 thread_local compute buffer(用完即 ggml_free,顺序执行可共用;
+  ggml 用外部 buffer 时不接管释放);② 极小图改单线程,只有末端 lm_head
+  (n_vocab×n_embd 大乘)保留 4 线程。
+- 结果(olmoe_stream 12 token,capacity 16,含加载):**2.73s → 1.36s(2.0×)**。
+  输出不变、parity(StreamingMatchesResident)仍逐 token 一致。
+- 未做(后续):批量/异步预取(miss 的磁盘读与 compute 重叠)、减少每 token 图趟数。
+
 ---
 
 ## 数据点追加模板
