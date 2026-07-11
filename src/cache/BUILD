@@ -24,3 +24,21 @@ cc_test(
         '//src/trace:routing_trace',  # 直接构造 RoutingTrace
     ],
 )
+
+cc_library(
+    name = 'os_page_cache_policy',
+    srcs = ['os_page_cache_policy.cc'],
+    hdrs = ['os_page_cache_policy.h'],
+    deps = [':cache_policy'],
+    visibility = ['PUBLIC'],
+)
+
+cc_test(
+    name = 'os_page_cache_policy_test',
+    srcs = ['os_page_cache_policy_test.cc'],
+    deps = [
+        ':os_page_cache_policy',
+        ':cache_policy',
+        '//src/trace:routing_trace',
+    ],
+)
