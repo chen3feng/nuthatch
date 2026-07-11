@@ -91,3 +91,35 @@ cc_binary(
         '//thirdparty/ggml:ggml',
     ],
 )
+
+cc_library(
+    name = 'generate',
+    srcs = ['generate.cc'],
+    hdrs = ['generate.h'],
+    deps = [
+        ':forward',
+        ':olmoe_model',
+        '//thirdparty/ggml:ggml',
+    ],
+    visibility = ['PUBLIC'],
+)
+
+cc_test(
+    name = 'generate_test',
+    srcs = ['generate_test.cc'],
+    deps = [
+        ':generate',
+        ':olmoe_model',
+        '//thirdparty/ggml:ggml',
+    ],
+)
+
+# 本地推理 + 对拍工具(CI 仅编译)。
+cc_binary(
+    name = 'olmoe_generate',
+    srcs = ['olmoe_generate_main.cc'],
+    deps = [
+        ':generate',
+        ':olmoe_model',
+    ],
+)
