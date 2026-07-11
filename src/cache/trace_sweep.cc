@@ -33,4 +33,20 @@ std::vector<SweepRow> SweepBudgets(const RoutingTrace& trace,
   return rows;
 }
 
+std::vector<PinRatioRow> SweepPinRatio(const RoutingTrace& trace,
+                                       uint32_t budget) {
+  const UsageHistogram usage = BuildUsage(trace);
+  std::vector<PinRatioRow> rows;
+  rows.reserve(budget + 1);
+  for (uint32_t pin = 0; pin <= budget; ++pin) {
+    LearnedPinPolicy learned(trace.n_layers, pin, budget - pin, usage);
+    PinRatioRow row;
+    row.pin = pin;
+    row.lru = budget - pin;
+    row.learned = Replay(trace, &learned).hit_rate();
+    rows.push_back(row);
+  }
+  return rows;
+}
+
 }  // namespace nuthatch

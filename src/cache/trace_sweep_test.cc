@@ -1,5 +1,6 @@
 #include "src/cache/trace_sweep.h"
 
+#include <algorithm>
 #include <vector>
 
 #include "gtest/gtest.h"
@@ -52,6 +53,23 @@ TEST(TraceSweepTest, SkipsZeroBudget) {
   const std::vector<SweepRow> rows = SweepBudgets(SkewedTrace(), {0, 2});
   ASSERT_EQ(rows.size(), 1u);
   EXPECT_EQ(rows[0].budget, 2u);
+}
+
+TEST(TraceSweepTest, PinRatioCurveHelpsOnSkew) {
+  const uint32_t budget = 4;
+  const std::vector<PinRatioRow> rows = SweepPinRatio(SkewedTrace(), budget);
+
+  ASSERT_EQ(rows.size(), budget + 1);  // pin = 0..budget
+  double best = 0.0;
+  for (uint32_t i = 0; i <= budget; ++i) {
+    EXPECT_EQ(rows[i].pin, i);
+    EXPECT_EQ(rows[i].pin + rows[i].lru, budget);
+    EXPECT_GE(rows[i].learned, 0.0);
+    EXPECT_LE(rows[i].learned, 1.0);
+    best = std::max(best, rows[i].learned);
+  }
+  // 偏斜 trace 上,某个 pin>0 的配比不劣于 pin=0(纯 LRU)——pinning 有用。
+  EXPECT_GE(best, rows[0].learned - 1e-9);
 }
 
 }  // namespace
