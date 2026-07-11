@@ -87,5 +87,27 @@ TEST(RoutingTraceTest, RejectsTruncatedBody) {
   std::remove(path.c_str());
 }
 
+TEST(RoutingTraceTest, ReadsTextTraceInfersDims) {
+  const std::string path = std::string(testing::TempDir()) + "/text.trace";
+  {
+    std::ofstream os(path);
+    os << "0 3 7\n";       // layer 0 选专家 3,7
+    os << "1 5 2 9\n";     // layer 1 选 5,2,9
+    os << "\n";            // 空行跳过
+    os << "0 9 1\n";       // layer 0 又一条
+  }
+  RoutingTrace t;
+  ASSERT_TRUE(ReadRoutingTraceText(path, &t));
+  EXPECT_EQ(t.records.size(), 3u);       // 空行不计
+  EXPECT_EQ(t.n_layers, 2u);             // max layer 1 + 1
+  EXPECT_EQ(t.n_expert, 10u);            // max expert 9 + 1
+  EXPECT_EQ(t.records[0].layer, 0u);
+  EXPECT_EQ(t.records[1].experts, (std::vector<uint32_t>{5, 2, 9}));
+  EXPECT_EQ(t.records[2].layer, 0u);
+
+  EXPECT_FALSE(ReadRoutingTraceText("/no/such.txt", &t));  // 缺文件
+  std::remove(path.c_str());
+}
+
 }  // namespace
 }  // namespace nuthatch

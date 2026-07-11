@@ -1,8 +1,11 @@
 #include "src/trace/routing_trace.h"
 
+#include <cstdint>
 #include <cstring>
 #include <fstream>
 #include <ostream>
+#include <sstream>
+#include <string>
 #include <utility>
 
 namespace nuthatch {
@@ -74,6 +77,35 @@ bool ReadRoutingTrace(const std::string& path, RoutingTrace* out) {
     }
     t.records.push_back(std::move(r));
   }
+  *out = std::move(t);
+  return true;
+}
+
+bool ReadRoutingTraceText(const std::string& path, RoutingTrace* out) {
+  std::ifstream is(path);
+  if (!is) return false;
+
+  RoutingTrace t;
+  uint32_t max_layer = 0, max_expert = 0;
+  uint32_t token = 0;
+  std::string line;
+  while (std::getline(is, line)) {
+    std::istringstream ls(line);
+    RoutingRecord r;
+    if (!(ls >> r.layer)) continue;  // 空行/坏行跳过
+    r.token = token++;
+    uint32_t e = 0;
+    while (ls >> e) {
+      r.experts.push_back(e);
+      if (e > max_expert) max_expert = e;
+    }
+    if (r.experts.empty()) continue;
+    if (r.layer > max_layer) max_layer = r.layer;
+    t.records.push_back(std::move(r));
+  }
+  if (t.records.empty()) return false;
+  t.n_layers = max_layer + 1;   // 层号从 0 起
+  t.n_expert = max_expert + 1;  // 专家号从 0 起
   *out = std::move(t);
   return true;
 }
