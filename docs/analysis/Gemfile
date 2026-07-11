@@ -1,0 +1,6 @@
+source "https://rubygems.org"
+
+# 用 GitHub Actions 从本子目录构建 just-the-docs 站点(见 .github/workflows/pages.yml)。
+gem "jekyll", "~> 4.3"
+gem "jekyll-remote-theme"   # _config.yml 用 remote_theme: just-the-docs/just-the-docs
+gem "webrick"               # jekyll 4 在 ruby 3 上需要
