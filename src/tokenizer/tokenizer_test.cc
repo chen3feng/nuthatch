@@ -32,6 +32,31 @@ TEST(TokenizerTest, DecodesByteLevel) {
   std::remove(path.c_str());
 }
 
+TEST(TokenizerTest, EncodesWithBpeAndRoundTrips) {
+  // 词表:byte-level 单字符 + 合并后的 "hi";merge 规则 "h i"。
+  const char* toks[] = {"h", "i", "hi"};
+  const char* mgs[] = {"h i"};
+  const std::string path = std::string(testing::TempDir()) + "/enc.gguf";
+
+  gguf_context* w = gguf_init_empty();
+  gguf_set_arr_str(w, "tokenizer.ggml.tokens", toks, 3);
+  gguf_set_arr_str(w, "tokenizer.ggml.merges", mgs, 1);
+  gguf_write_to_file(w, path.c_str(), /*only_meta=*/true);
+  gguf_free(w);
+
+  auto tk = Tokenizer::Load(path);
+  ASSERT_NE(tk, nullptr);
+
+  // "hi" 预分词为一个 chunk,byte-level ['h','i'],按 merge "h i" 合成 "hi"。
+  EXPECT_EQ(tk->Encode("hi"), (std::vector<int32_t>{2}));
+  // 单个 'h' → [0]。
+  EXPECT_EQ(tk->Encode("h"), (std::vector<int32_t>{0}));
+  // round-trip:encode → decode 还原文本。
+  EXPECT_EQ(tk->Decode(tk->Encode("hi")), "hi");
+
+  std::remove(path.c_str());
+}
+
 TEST(TokenizerTest, ReturnsNullWithoutVocab) {
   // 一个没有 tokenizer.ggml.tokens 的 GGUF。
   const std::string path = std::string(testing::TempDir()) + "/novocab.gguf";

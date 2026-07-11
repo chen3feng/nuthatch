@@ -37,5 +37,6 @@ vcpkg_config(
     packages = {
         'gtest': {'version': '1.17.0'},
         'ggml': {'version': '0.11.1'},   # baseline 已含此版本,无需 bump;metal/cuda/vulkan 等 feature 留到 M4
+        'pcre2': {},                     # tokenizer 预分词的 Unicode 正则(\p{L}+lookahead);self-contained,无 abseil
     },
 )
