@@ -1,0 +1,7 @@
+*.gguf
+*.bin
+/build/
+blade-bin
+.blade/
+__pycache__/
+.DS_Store
