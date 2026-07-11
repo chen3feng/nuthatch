@@ -25,19 +25,24 @@ std::unique_ptr<GgufReader> GgufReader::Open(const std::string& path) {
     info.name = gguf_get_tensor_name(gguf, i);
     info.type = gguf_get_tensor_type(gguf, i);
     info.offset = gguf_get_tensor_offset(gguf, i);
+    info.size = gguf_get_tensor_size(gguf, i);
     // 形状从 meta context 里同名张量的 ne[] 取(gguf 本身只给 name/type/offset)。
     if (const ggml_tensor* t = ggml_get_tensor(meta, info.name.c_str())) {
       info.shape.assign(t->ne, t->ne + ggml_n_dims(t));
     }
     tensors.push_back(std::move(info));
   }
+  const size_t data_offset = gguf_get_data_offset(gguf);
   return std::unique_ptr<GgufReader>(
-      new GgufReader(gguf, meta, std::move(tensors)));
+      new GgufReader(gguf, meta, std::move(tensors), data_offset));
 }
 
 GgufReader::GgufReader(gguf_context* gguf, ggml_context* meta,
-                       std::vector<TensorInfo> tensors)
-    : gguf_(gguf), meta_(meta), tensors_(std::move(tensors)) {}
+                       std::vector<TensorInfo> tensors, size_t data_offset)
+    : gguf_(gguf),
+      meta_(meta),
+      tensors_(std::move(tensors)),
+      data_offset_(data_offset) {}
 
 GgufReader::~GgufReader() {
   if (gguf_ != nullptr) gguf_free(gguf_);

@@ -22,6 +22,7 @@ class GgufReader {
     std::string name;
     ggml_type type;
     size_t offset;               // 相对张量数据段起点的字节偏移
+    size_t size;                 // 张量数据字节数
     std::vector<int64_t> shape;  // ne[]:各维长度,最内层维度在前
   };
 
@@ -45,13 +46,18 @@ class GgufReader {
   }
   const std::vector<TensorInfo>& tensors() const { return tensors_; }
 
+  // 张量数据段在文件中的绝对起始偏移。
+  // 某张量的文件绝对偏移 = data_offset() + info.offset。
+  size_t data_offset() const { return data_offset_; }
+
  private:
   GgufReader(gguf_context* gguf, ggml_context* meta,
-             std::vector<TensorInfo> tensors);
+             std::vector<TensorInfo> tensors, size_t data_offset);
 
   gguf_context* gguf_ = nullptr;
   ggml_context* meta_ = nullptr;  // no_alloc:只承载张量形状,不含数据
   std::vector<TensorInfo> tensors_;
+  size_t data_offset_ = 0;
 };
 
 }  // namespace nuthatch
