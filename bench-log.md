@@ -190,6 +190,18 @@
 - 代价:流式慢于常驻(逐 token 多趟小图 + miss 磁盘读);速度非本阶段目标。
 - 正确性锚点:UT StreamingMatchesResident(流式==GreedyGenerateCached 逐 token 一致)。
 
+### 2026-07-11 — pin/lru 配比曲线:OLMoE 上"越静态越好"(P27)
+
+- 方法:固定总预算 16/层,把 learned-pin 的 pin 槽数从 0(≈纯 per-layer LRU)扫到
+  16(全静态最热、无 LRU),看命中率。`trace_replay <trace> pin 16`。
+- 结果(story trace,1072 records):pin=0 **48.0%** → pin=8 53.7% → pin=16 **57.8%**,
+  **单调向上**,最优在 pin=budget(全静态)。
+- 结论:OLMoE 专家使用不仅偏斜、而且**稳定**(热专家从头热到尾),所以追踪"最近
+  使用"的 LRU 槽几乎不加值——静态钉住全局最热即最优。原本"最优在中间"的假设被否。
+- ★ 诚实注脚:usage 直方图是从**被重放的同一条 trace** 建的(in-sample),pin=budget
+  因而偏乐观。真实部署应从一次校准跑建直方图、用到**新输入**——那时 LRU 兜分布漂移
+  会更有价值。"跨输入迁移"(prior 从 A 建、用到 B)是更严谨的后续问题。
+
 ---
 
 ## 数据点追加模板

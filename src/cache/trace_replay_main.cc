@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <string>
 #include <vector>
 
 #include "src/cache/trace_sweep.h"
@@ -20,14 +21,26 @@ int main(int argc, char** argv) {
     return 1;
   }
 
+  std::printf("trace: %zu records, %u layers, %u experts/layer\n",
+              t.records.size(), t.n_layers, t.n_expert);
+
+  // pin/lru 配比曲线模式:trace_replay <trace> pin <budget>
+  if (argc >= 4 && std::string(argv[2]) == "pin") {
+    const uint32_t budget = static_cast<uint32_t>(std::atoi(argv[3]));
+    std::printf("\n固定预算 %u/层,pin/lru 配比曲线:\n", budget);
+    std::printf("  pin  lru   learned\n");
+    for (const nuthatch::PinRatioRow& r : nuthatch::SweepPinRatio(t, budget)) {
+      std::printf("%5u %4u   %6.1f%%\n", r.pin, r.lru, 100.0 * r.learned);
+    }
+    return 0;
+  }
+
   std::vector<uint32_t> budgets;
   for (int i = 2; i < argc; ++i) {
     budgets.push_back(static_cast<uint32_t>(std::atoi(argv[i])));
   }
   if (budgets.empty()) budgets = {4, 8, 12, 16, 24, 32};
 
-  std::printf("trace: %zu records, %u layers, %u experts/layer\n",
-              t.records.size(), t.n_layers, t.n_expert);
   std::printf("\nbudget/L   learned     lru       os      learned-lru\n");
   for (const nuthatch::SweepRow& r : nuthatch::SweepBudgets(t, budgets)) {
     std::printf("%6u    %6.1f%%   %6.1f%%   %6.1f%%    %+.1f pp\n", r.budget,
