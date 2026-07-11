@@ -81,7 +81,7 @@ TEST(StreamingModelTest, ResidentNonExpertMatchesFullExpertsStreamed) {
   EXPECT_EQ(sm->config().n_expert, full->config().n_expert);
 
   // 非专家张量:常驻且逐字节等同全量加载。
-  for (const std::string& name :
+  for (const char* name :
        {"token_embd.weight", "output.weight", "output_norm.weight",
         "blk.0.attn_q.weight", "blk.1.ffn_gate_inp.weight",
         "blk.1.ffn_norm.weight"}) {
@@ -94,7 +94,7 @@ TEST(StreamingModelTest, ResidentNonExpertMatchesFullExpertsStreamed) {
   }
 
   // 专家张量:StreamingModel 不常驻,但可经 reader 流式读到、且字节一致。
-  for (const std::string& en :
+  for (const char* en :
        {"blk.0.ffn_gate_exps.weight", "blk.0.ffn_up_exps.weight",
         "blk.1.ffn_down_exps.weight"}) {
     EXPECT_EQ(sm->tensor(en), nullptr) << en;
