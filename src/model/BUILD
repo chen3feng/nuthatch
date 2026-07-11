@@ -121,5 +121,6 @@ cc_binary(
     deps = [
         ':generate',
         ':olmoe_model',
+        '//src/tokenizer:tokenizer',  # 解码生成文本
     ],
 )
