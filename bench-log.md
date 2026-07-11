@@ -118,6 +118,17 @@
 - [ ] 严谨测 per-row int4 vs Q4_K_M 的精度差(colibrì 明确求助、没做的事)。
 - [ ] (交叉研究)在 Mixtral 上:MC-SMoE 合并前/后,流式学习缓存命中率曲线怎么变?
 
+### 2026-07-11 — KV cache:~2× decode 提速,且大 T 更稳(P18)
+
+- 机器/存储:M4 Pro,48GB,内置 SSD;模型:OLMoE-1B-7B Instruct Q4_K_M(常驻)。
+- 命令:`olmoe_generate <model> <N> The capital of France is`(cached 默认;`NUTHATCH_NO_KV_CACHE=1` 切每步重算)。
+- 结果(prompt "The capital of France is",贪心):
+  - **生成 id 完全一致**:cached 与 no-cache 逐 token 相同(→ `Paris.`),token-exact。
+  - **速度**(N=12):cached **22.5 tok/s** vs no-cache **11.5 tok/s** ≈ **×2**。
+  - **稳健性**:N=24 时 no-cache 在 `BuildMoe`→`ggml_add` 崩(每步整段前向的图 ctx 在大 T 下不够);cached 每步只前向 1 token,稳跑 **38 tok/s**。
+- 结论:KV cache 让 decode 从 O(T)/步 降到 O(1)/步(读缓存 K/V),既更快又避开了重算路径的大-T 脆弱性。正确性锚点 `CachedMatchesUncached` 单测护住。
+- 待办:每 decode 步仍重建 ggml_context(128MB init)——后续可复用预分配 compute buffer 进一步提速。
+
 ---
 
 ## 数据点追加模板

@@ -1,7 +1,10 @@
 #ifndef NUTHATCH_MODEL_FORWARD_H_
 #define NUTHATCH_MODEL_FORWARD_H_
 
+#include <vector>
+
 #include "ggml.h"
+#include "src/model/kv_cache.h"
 #include "src/model/olmoe_model.h"
 
 namespace nuthatch {
@@ -20,6 +23,15 @@ namespace nuthatch {
 ggml_tensor* BuildForward(ggml_context* ctx, const OlmoeModel& model,
                           ggml_tensor* token_ids, ggml_tensor* pos,
                           bool norm_topk);
+
+// 带 KV cache 的前向。只对本步的 token(token_ids/pos)建图,注意力读缓存旧段、
+// 写新段(cpy 节点追加进 *cache_writes,调用方需 expand 进图)。位置从 kv->n_past()
+// 起。返回本步各位置的 logits [n_vocab, T]。逐层与 BuildForward 对应,
+// 故 prefill(n_past=0,喂整段 prompt)结果与 BuildForward 相同。
+ggml_tensor* BuildForwardCached(ggml_context* ctx, const OlmoeModel& model,
+                                const KvCache& kv, ggml_tensor* token_ids,
+                                ggml_tensor* pos, bool norm_topk,
+                                std::vector<ggml_tensor*>* cache_writes);
 
 }  // namespace nuthatch
 

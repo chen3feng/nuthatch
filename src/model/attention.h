@@ -1,6 +1,8 @@
 #ifndef NUTHATCH_MODEL_ATTENTION_H_
 #define NUTHATCH_MODEL_ATTENTION_H_
 
+#include <vector>
+
 #include "ggml.h"
 #include "src/model/olmoe_model.h"
 
@@ -28,6 +30,19 @@ struct AttnWeights {
 ggml_tensor* BuildAttention(ggml_context* ctx, const OlmoeConfig& cfg,
                             const AttnWeights& w, ggml_tensor* x,
                             ggml_tensor* pos);
+
+// 带 KV cache 的注意力。x 是新 token [n_embd, T],绝对位置从 n_past 起(pos 给出)。
+//   cache_k/cache_v : 本层缓存张量 [n_embd_kv, max_seq](常驻,跨步存活)
+//   n_past          : 已缓存的 token 数
+//   cache_writes    : 追加"把新 k/v 写入 cache[n_past:n_past+T]"的 cpy 节点,
+//                     由调用方 ggml_build_forward_expand 进图(它们不在 logits 路径上)
+// 读缓存 [0:n_past] 段(旧数据)拼新 k/v → 完整 K/V;因果 mask 用 n_past 偏移。
+// 与 BuildAttention 算子完全对应:prefill(n_past=0)结果应逐元素相同。
+ggml_tensor* BuildAttentionCached(ggml_context* ctx, const OlmoeConfig& cfg,
+                                  const AttnWeights& w, ggml_tensor* x,
+                                  ggml_tensor* pos, ggml_tensor* cache_k,
+                                  ggml_tensor* cache_v, int n_past,
+                                  std::vector<ggml_tensor*>* cache_writes);
 
 }  // namespace nuthatch
 
