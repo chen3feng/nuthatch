@@ -9,6 +9,7 @@
 
 #include "src/model/generate.h"
 #include "src/model/olmoe_model.h"
+#include "src/tokenizer/tokenizer.h"
 
 int main(int argc, char** argv) {
   if (argc < 4) {
@@ -34,8 +35,15 @@ int main(int argc, char** argv) {
   std::vector<int32_t> gen =
       nuthatch::GreedyGenerate(*model, ids, n_predict, norm_topk);
 
-  std::printf("generated:");
+  std::printf("generated ids:");
   for (int32_t t : gen) std::printf(" %d", t);
   std::printf("\n");
+
+  // 若模型带词表,把 prompt + 生成解码成文本打印(自包含输出)。
+  if (auto tok = nuthatch::Tokenizer::Load(argv[1])) {
+    std::vector<int32_t> full = ids;
+    full.insert(full.end(), gen.begin(), gen.end());
+    std::printf("text: %s\n", tok->Decode(full).c_str());
+  }
   return 0;
 }
