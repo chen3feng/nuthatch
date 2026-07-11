@@ -195,6 +195,34 @@ cc_library(
     visibility = ['PUBLIC'],
 )
 
+# 物理流式前向:逐 token 两段式,专家按需装槽再算(真省内存)。
+cc_library(
+    name = 'streaming_forward',
+    srcs = ['streaming_forward.cc'],
+    hdrs = ['streaming_forward.h'],
+    deps = [
+        ':streaming_model',
+        ':attention',
+        ':expert_slot_cache',
+        ':kv_cache',
+        ':olmoe_model',
+        '//thirdparty/ggml:ggml',
+    ],
+    visibility = ['PUBLIC'],
+)
+
+cc_test(
+    name = 'streaming_forward_test',
+    srcs = ['streaming_forward_test.cc'],
+    deps = [
+        ':streaming_forward',
+        ':streaming_model',
+        ':generate',               # GreedyGenerateCached 作 parity 基准
+        ':olmoe_model',
+        '//thirdparty/ggml:ggml',
+    ],
+)
+
 cc_test(
     name = 'generate_test',
     srcs = ['generate_test.cc'],
@@ -216,6 +244,17 @@ cc_binary(
         ':generate',
         ':olmoe_model',
         '//src/tokenizer:tokenizer',  # 解码生成文本
+    ],
+)
+
+# 物理流式推理 demo(CI 仅编译):专家按需装槽,输出文本 + 峰值内存。
+cc_binary(
+    name = 'olmoe_stream',
+    srcs = ['olmoe_stream_main.cc'],
+    deps = [
+        ':streaming_forward',
+        ':streaming_model',
+        '//src/tokenizer:tokenizer',
     ],
 )
 
