@@ -7,6 +7,8 @@
 #include <string>
 #include <unordered_map>
 
+#include "src/io/tensor_source.h"
+
 namespace nuthatch {
 
 // 从 GGUF 文件按需读取【单个专家】的量化权重字节(不常驻整张专家张量)。
@@ -18,9 +20,9 @@ namespace nuthatch {
 // 路径是后续 TODO(colibrì 亦未做)。
 class ExpertReader {
  public:
-  // 打开 GGUF(只读元数据拿偏移/步长,不载权重数据)并保持文件 fd。失败返回 nullptr。
+  // 打开 GGUF(只读元数据拿偏移/步长,不载权重数据)并保持一个只读定位读句柄。
+  // 失败返回 nullptr。
   static std::unique_ptr<ExpertReader> Open(const std::string& gguf_path);
-  ~ExpertReader();
 
   ExpertReader(const ExpertReader&) = delete;
   ExpertReader& operator=(const ExpertReader&) = delete;
@@ -45,9 +47,10 @@ class ExpertReader {
     int n_experts;         // ne[2]
     int32_t type;          // 元素类型(ggml_type as int)
   };
-  ExpertReader(int fd, std::unordered_map<std::string, Info> info);
+  ExpertReader(std::unique_ptr<TensorSource> src,
+               std::unordered_map<std::string, Info> info);
 
-  int fd_ = -1;
+  std::unique_ptr<TensorSource> src_;  // 跨平台定位读句柄
   std::unordered_map<std::string, Info> info_;
 };
 

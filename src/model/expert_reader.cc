@@ -1,8 +1,5 @@
 #include "src/model/expert_reader.h"
 
-#include <fcntl.h>
-#include <unistd.h>
-
 #include <utility>
 
 #include "ggml.h"
@@ -34,17 +31,15 @@ std::unique_ptr<ExpertReader> ExpertReader::Open(const std::string& gguf_path) {
   gguf_free(g);
   ggml_free(ctx);
 
-  const int fd = open(gguf_path.c_str(), O_RDONLY);
-  if (fd < 0) return nullptr;
-  return std::unique_ptr<ExpertReader>(new ExpertReader(fd, std::move(info)));
+  auto src = TensorSource::Open(gguf_path);  // 跨平台定位读句柄
+  if (src == nullptr) return nullptr;
+  return std::unique_ptr<ExpertReader>(
+      new ExpertReader(std::move(src), std::move(info)));
 }
 
-ExpertReader::ExpertReader(int fd, std::unordered_map<std::string, Info> info)
-    : fd_(fd), info_(std::move(info)) {}
-
-ExpertReader::~ExpertReader() {
-  if (fd_ >= 0) close(fd_);
-}
+ExpertReader::ExpertReader(std::unique_ptr<TensorSource> src,
+                           std::unordered_map<std::string, Info> info)
+    : src_(std::move(src)), info_(std::move(info)) {}
 
 size_t ExpertReader::ExpertBytes(const std::string& name) const {
   auto it = info_.find(name);
@@ -67,13 +62,10 @@ bool ExpertReader::ReadExpert(const std::string& name, int expert_idx,
   if (it == info_.end()) return false;
   const Info& in = it->second;
   if (expert_idx < 0 || expert_idx >= in.n_experts) return false;
-
-  const off_t off = static_cast<off_t>(in.file_offset) +
-                    static_cast<off_t>(expert_idx) *
-                        static_cast<off_t>(in.expert_bytes);
-  // pread:按绝对偏移读,不改文件位移,可多线程并发(未来多路预取)。
-  const ssize_t n = pread(fd_, out, in.expert_bytes, off);
-  return n == static_cast<ssize_t>(in.expert_bytes);
+  // 定位读该专家的量化字节(不改文件位置、可并发,量化字节可直接喂 mul_mat)。
+  const size_t off =
+      in.file_offset + static_cast<size_t>(expert_idx) * in.expert_bytes;
+  return src_->ReadAt(off, in.expert_bytes, out);
 }
 
 }  // namespace nuthatch

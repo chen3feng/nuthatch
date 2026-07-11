@@ -2,7 +2,12 @@
 // 输出文本 + 峰值常驻内存(证明真省 RAM,常驻路径需 ~4GB)。速度不是重点——
 // 逐 token 多趟小图 + miss 时磁盘读,慢于常驻;价值是"真在受限内存里跑起来"。
 //   olmoe_stream <model.gguf> <n_predict> <capacity/层> <prompt...>
+#ifdef _WIN32
+#include <windows.h>
+#include <psapi.h>
+#else
 #include <sys/resource.h>
+#endif
 
 #include <cstdint>
 #include <cstdio>
@@ -46,11 +51,17 @@ int main(int argc, char** argv) {
   full.insert(full.end(), gen.begin(), gen.end());
   std::printf("text: %s\n", tok->Decode(full).c_str());
 
+#ifdef _WIN32
+  PROCESS_MEMORY_COUNTERS pmc = {};
+  GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc));
+  const double mb = pmc.PeakWorkingSetSize / (1024.0 * 1024.0);
+#elif defined(__APPLE__)
   struct rusage ru;
   getrusage(RUSAGE_SELF, &ru);
-#ifdef __APPLE__
   const double mb = ru.ru_maxrss / (1024.0 * 1024.0);  // macOS:字节
 #else
+  struct rusage ru;
+  getrusage(RUSAGE_SELF, &ru);
   const double mb = ru.ru_maxrss / 1024.0;  // Linux:KB
 #endif
   std::printf("peak RSS: %.0f MB (capacity=%d 专家/层,非专家常驻)\n", mb,

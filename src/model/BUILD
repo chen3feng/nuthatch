@@ -66,6 +66,7 @@ cc_library(
     deps = [
         ':expert_reader',
         ':olmoe_model',            # OlmoeConfig + ParseOlmoeConfig
+        '//src/io:tensor_source',  # 跨平台定位读(常驻非专家权重)
         '//thirdparty/ggml:ggml',
     ],
     visibility = ['PUBLIC'],
@@ -87,7 +88,10 @@ cc_library(
     name = 'expert_reader',
     srcs = ['expert_reader.cc'],
     hdrs = ['expert_reader.h'],
-    deps = ['//thirdparty/ggml:ggml'],  # gguf 偏移/形状 + ggml 张量 nb/ne
+    deps = [
+        '//src/io:tensor_source',  # 跨平台定位读
+        '//thirdparty/ggml:ggml',  # gguf 偏移/形状 + ggml 张量 nb/ne
+    ],
     visibility = ['PUBLIC'],
 )
 

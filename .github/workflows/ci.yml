@@ -9,7 +9,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]   # windows 在 PR#16 加入
+        os: [ubuntu-latest, macos-latest]   # Windows 的可移植 I/O 见下方 windows-io job
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -41,3 +41,16 @@ jobs:
 
       - name: Build & test
         run: blade test //...
+
+  # blade 面向 Unix,Windows 上不跑完整构建;单独用 MSVC 编可移植 I/O 层
+  # (TensorSource 的 ReadFile+OVERLAPPED 路径)+ 跑功能冒烟,守住 Windows 读路径。
+  windows-io:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ilammy/msvc-dev-cmd@v1
+      - name: Portable I/O smoke (MSVC ReadFile + OVERLAPPED)
+        shell: cmd
+        run: |
+          cl /nologo /std:c++17 /EHsc /W4 /I. src\io\tensor_source.cc tools\win_io_smoke.cc /Fe:smoke.exe
+          smoke.exe
