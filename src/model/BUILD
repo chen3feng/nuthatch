@@ -15,3 +15,24 @@ cc_test(
         '//thirdparty/ggml:ggml',  # 测试自造 tiny-OLMoE GGUF fixture
     ],
 )
+
+cc_library(
+    name = 'attention',
+    srcs = ['attention.cc'],
+    hdrs = ['attention.h'],
+    deps = [
+        ':olmoe_model',            # OlmoeConfig
+        '//thirdparty/ggml:ggml',
+    ],
+    visibility = ['PUBLIC'],
+)
+
+cc_test(
+    name = 'attention_test',
+    srcs = ['attention_test.cc'],
+    deps = [
+        ':attention',
+        ':olmoe_model',
+        '//thirdparty/ggml:ggml',
+    ],
+)
