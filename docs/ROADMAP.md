@@ -43,6 +43,7 @@
 - **详细 PR 说明**:每个 PR 按下面模板写清"为什么/做了什么/怎么测/学到什么",既是 review 材料,也是学习笔记。
 - **代码注释**:**简洁而清晰**——注释解释"为什么这么做 / 非显然的约束"(如 super-block 对齐、为何用 pread 不用 mmap、fault-in 时机),**不复述代码在做什么**。关键数据结构和跨平台分支必须有一句话说明。
 - **辅助脚本/工具用 Python**:运行时引擎是 C++,但**离线/辅助工具用 Python**(和 colibrì 一样的分工)——fixture 生成、trace 抓取与解析、画图、benchmark 编排、GGUF 探查。Python 工具放 `tools/`,不进运行时依赖。
+- **第三方依赖引入前先讨论**:任何新的第三方库(C++ 或 Python)在写进 BUILD/`requirements.txt` 前,**先讨论、达成一致**,并记入 `docs/dependencies.md` 依赖账本(库名/用途/许可/哪个 PR 需要/状态)。**保持依赖最小**——每个依赖也是 blade "链接第三方库" 的一个 dogfooding 用例。
 
 ### PR 说明模板
 ```markdown
@@ -59,21 +60,23 @@
 踩到的 blade 摩擦点(同步到 docs/blade-feedback.md)。
 ```
 
-### blade BUILD 约定(示例)
-```python
-# BLADE_ROOT 在仓库根
+### blade BUILD 约定(照 [flare](https://github.com/Tencent/flare) 的实践)
+- `BLADE_ROOT` 里配 **`vcpkg_config`**(引入 ggml/gtest,pin 版本)+ **`cc_test_config`**(自动注入 gtest_main)。
+- `thirdparty/{googletest,ggml}/BUILD` = **薄封装 `vcpkg#...`**(如 `vcpkg#ggml:ggml`、`vcpkg#gtest:gtest`)。
+- `cc_test` **不用显式写 gtest_main**——BLADE_ROOT 已全局注入。
 
+```python
 # src/gguf/BUILD
 cc_library(
     name = 'gguf',
     srcs = ['gguf_reader.cc'],
     hdrs = ['gguf_reader.h'],
-    deps = ['//thirdparty/ggml:ggml'],
+    deps = ['//thirdparty/ggml:ggml'],   # 薄封装 vcpkg#ggml:ggml
 )
 cc_test(
     name = 'gguf_test',
     srcs = ['gguf_reader_test.cc'],
-    deps = [':gguf', '//thirdparty/googletest:gtest_main'],
+    deps = [':gguf'],                     # gtest_main 由 BLADE_ROOT cc_test_config 自动注入
     testdata = ['//testdata:tiny_moe.gguf'],
 )
 ```
@@ -100,6 +103,7 @@ cc_test(
 | **M2** | 路由 trace + 缓存模拟器 ★研究核心 | #6–#10 | **第一张命中率曲线图(learned vs LRU vs OS)** |
 | **M3** | 真实流式专家存储 + 引擎 | #11–#14 | token-exact 的流式 MoE 前向 + e2e 命中率 |
 | **M4** | 平台 & 计算后端 | #15–#17 | Metal / Windows / 预取+MTP |
+| **M5**(可选) | OpenAI 兼容服务 | #18 | Python 网关(cpp-httplib 备选),引擎跑通后再做 |
 
 ---
 
@@ -108,14 +112,14 @@ cc_test(
 ### M0 — 工程骨架
 
 **PR#1 — blade 脚手架 + CI + gtest 冒烟**
-- 交付:`BLADE_ROOT`、`thirdparty/googletest`、一个 trivial `cc_library`(如 `util:version`)+ `cc_test`、`.github/workflows/ci.yml`。
+- 交付:`BLADE_ROOT`(含 `vcpkg_config` + `cc_test_config`,照 flare)、`thirdparty/googletest`(薄封装 `vcpkg#gtest`)、一个 trivial `cc_library`(如 `util:version`)+ `cc_test`、`.github/workflows/ci.yml`。
 - UT:`version_test` 断言版本号。
 - CI:linux+mac 跑 `blade test //...` 绿。
 - 完成:CI 徽章绿;`blade test` 本地通过。
 - 学到:blade BUILD 结构、gtest、GH Actions。
 
 **PR#2 — 链接 ggml**
-- 交付:`thirdparty/ggml/BUILD`(包本地 ggml 源码或 submodule),一个调用 ggml 的冒烟库。
+- 交付:`thirdparty/ggml/BUILD`(薄封装 `vcpkg#ggml:ggml`;或先包本地源码取最新——见 dependencies.md 待定项),一个调用 ggml 的冒烟库。
 - UT:`ggml_smoke_test` —— `ggml_init` → 建一个 `a*b` 的 1×1 图 → 跑 CPU backend → 断言结果。
 - CI:linux+mac 都能链接 + 跑通。
 - 完成:ggml 作为 blade 依赖可用。
@@ -209,6 +213,14 @@ cc_test(
 - 交付:router-lookahead 预取(专用 I/O 线程)+ MTP 批量验证(如果目标模型有 MTP 头)。
 - UT:预取预测命中率;MTP 批量验证 token-exact。
 - 学到:colibrì 剩下的两个杠杆。
+
+### M5(可选)— OpenAI 兼容服务
+
+**PR#18 — OpenAI 兼容 HTTP 服务(引擎跑通后再做)**
+- 交付:默认 **Python 网关**(`tools/`,标准库 `http.server` 或 FastAPI),引擎作子进程走行协议;OpenAI 兼容 `/v1/chat/completions` + SSE 流式 + 有界 FIFO 调度。cpp-httplib 为 C++ 单体备选(引入前先讨论)。
+- UT:Python 单测(请求→响应形状、SSE 分帧、429/超时);若走 cpp-httplib 则加 C++ UT。
+- 完成:标准 OpenAI 客户端(含 colibrì 分析里那个 web UI)能对话。
+- 学到:OpenAI 协议、SSE、有界 FIFO;C++↔Python 分工。
 
 ---
 
