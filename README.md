@@ -33,7 +33,7 @@
 | **流式**(每层缓存 16 专家) | "The capital of France is Paris." | **1.2 GB** |
 | 常驻(全部专家进内存) | 同上,逐 token 一致 | 3.0 GB |
 
-**同一模型、逐 token 完全一致的输出,内存降到 ~40%。**
+**同一模型、逐 token 完全一致的输出,内存降到 ~40%。** 逐 token 多趟小图的流式路径起初慢,后来靠"复用 compute buffer + 极小图单线程"提速 **2×**。
 
 ---
 
@@ -83,15 +83,19 @@ olmoe_stream <model.gguf> 12 16 The capital of France is
 # ③ 护城河证据:真实推理导出路由 trace,三策略比命中率
 olmoe_trace <model.gguf> 64 16 Once upon a time
 
-# ④ 曲线:读一条 trace 秒级扫多个预算(不重载模型)
+# ④ 曲线:读一条 trace 秒级扫多个预算 / 或 pin/lru 配比(不重载模型)
 trace_replay some.trace 4 8 12 16 24 32
+trace_replay some.trace pin 16
+
+# ⑤ 跨架构:重放别的 MoE 的路由 trace(本仓附了 granite-moe 的)
+trace_replay --text data/granite3moe.trace.txt 4 8 12 16
 ```
 
 全程没有一行借 llama.cpp 做运行时——分词、KV cache、MoE 前向、流式缓存都是自己的代码;正确性靠**逐 token 对拍 llama.cpp** 保证。
 
 ---
 
-## 沿着 24 个 PR 学
+## 沿着 30 个 PR 学
 
 这个仓库是**按学习顺序**长出来的。想学推理引擎,可以顺着 PR 读——每个 PR 都有详细的"为什么这么做",代码有简洁注释,且都带单测。按里程碑分组:
 
@@ -105,6 +109,7 @@ trace_replay some.trace 4 8 12 16 24 32
 | **KV cache** | #18 | 单序列 KV cache 的 ggml 实现,decode 从 O(T²) 降到每步 O(1),**用 `concat` 避开图排序陷阱** |
 | **流式护城河** | #19–#22 | 按需读单个专家(`pread`)→ 有界槽缓存(LRU + 从盘装载)→ **把真实推理 trace 接进 M2 策略** → 命中率曲线 + 跨领域稳健性 |
 | **物理流式** | #23–#24 | 选择性加载(非专家常驻、专家留盘)→ **逐 token 两段式前向**(段A 路由 → 装槽 → 段B 在槽上算)→ 真省内存、token-exact |
+| **打磨与推广** | #25–#30 | README/门面 → pin/lru 配比曲线 → **流式提速 2×**(复用 compute buffer + 小图单线程)→ **Windows I/O + CI**(`ReadFile`+`OVERLAPPED`,MSVC 冒烟)→ **跨架构验证**(patched llama.cpp 导 granite-moe 路由 → learned 同样赢) |
 
 每一步都有一个"正确性锚点":`能推理`对拍 llama.cpp、`tokenizer`对拍 llama-tokenize、`KV cache`和`流式`都用 **`==` 常驻路径逐 token 一致**的单测守住。这套"每加一层就锚一次正确性"的做法,本身就是最值得学的东西。
 
@@ -115,11 +120,11 @@ trace_replay some.trace 4 8 12 16 24 32
 ```text
 src/
   gguf/       GGUF 元数据读取器(P3)
-  io/         张量字节读取:pread,非 mmap(P4)
+  io/         定位读:POSIX pread / Windows ReadFile+OVERLAPPED,跨平台(P4, P29)
   moe/        MoE 融合专家张量布局(P5)
-  trace/      路由 trace 二进制格式 + 读写(P6)
+  trace/      路由 trace 二进制 + 文本读写(P6, P30)
   cache/      缓存策略:cache_policy 接口 · lru · os_page · learned_pin
-              · trace_sweep/replay(P8–P10, P22)—— 护城河的算法在这里
+              · trace_sweep/replay(budget & pin/lru 配比曲线)—— 护城河的算法在这里
   tokenizer/  GPT-2 byte-level BPE:解码 + PCRE2 预分词 + BPE 编码(P16–P17)
   model/      引擎主体(P11–P24):
               olmoe_model   加载(config + 常驻权重)
@@ -128,10 +133,12 @@ src/
               forward       整图前向(+ 带 KV cache 的变体)
               generate      贪心生成(+ KV cache + 导出真实路由 trace)
               kv_cache      单序列 KV 缓存
-              expert_reader     按需从 GGUF pread 单个专家
+              expert_reader     按需读单个专家(经跨平台 io/)
               expert_slot_cache 每层有界专家槽缓存(LRU + 装载)
               streaming_model   显存受限加载(非专家常驻)
               streaming_forward 两段式物理流式前向
+data/         跨架构验证工件:granite3-moe 路由 trace(P30)
+docs/         ROADMAP · 依赖账本 · blade 反馈 · 跨架构 trace 提取法
 ```
 
 一条清晰的依赖链:`gguf/io/moe`(读格式)→ `trace/cache`(做研究)→ `model`(建引擎)→ `expert_reader/slot_cache/streaming_*`(接上护城河)。
@@ -150,6 +157,8 @@ src/
 - **`norm_topk=false` 的发现**:第一次生成出 "…is **called** Paris",而 llama.cpp 是 "…is Paris"。对拍发现 OLMoE **不**对 top-k 权重归一;改掉后首 token 精确一致。**对拍是最好的调试器。**
 - **命中率:先 trace + 重放,不急着物理执行**:要证明"learned 赢",不需要真把专家搬进显存算——真实推理导出访问轨迹、用模拟器重放对比即可(标准方法)。**先拿到研究结论,物理执行作为后续工程。**
 - **两段式流式前向**:专家选择依赖运行时激活,所以必须**先算路由拿到选中的专家、再装载、再计算**——一层拆成两趟图。读旧缓存段用 `concat`(天然有数据依赖)、写新段用 `cpy`(读写区不相交),干净地避开了 ggml 的图排序陷阱。
+- **交叉验证选 granite,而非 26GB 的 Mixtral**:要证明护城河不是 OLMoE 专属,不必硬跑 Mixtral(~26GB + 还得实现它的架构)。改用 **821MB 的 granite-moe**,给 llama.cpp 打个小补丁导出它的路由 trace 喂 `trace_replay`——**只验证缓存结论、不跑进引擎**。小下载、真异构,比再跑一个同类模型更有说服力。
+- **pin/lru 曲线否掉了自己的假设**:原以为最优配比"在中间",实测 OLMoE 上"越静态越好"(热专家稳定,LRU 的最近使用几乎不加值);且如实标注了 in-sample 直方图偏乐观。**诚实比好看重要。**
 
 这些判断连同 `docs/blade-feedback.md`(dogfood 构建系统时的真实反馈,包括 CI 抓到的 `-Werror` 跨平台坑)一起,是这个项目"教学价值"的另一半。
 
@@ -160,9 +169,9 @@ src/
 保持诚实(这也是项目一贯的态度):
 
 - **只有贪心 argmax**,没有采样、没有 chat 模板、没有 batch/并发。
-- **流式路径慢**(逐 token 多趟小图 + miss 时磁盘读)——本阶段目标是"**真的**在受限内存里跑起来且 token-exact",不是速度。
-- **验证在 CPU**;ggml 的 Metal/CUDA/Vulkan 后端理论可接但未验证。
-- **只支持 OLMoE 架构**(可作为接更多 MoE 的模板)。
+- **流式路径仍慢于常驻**(逐 token 多趟小图 + miss 磁盘读;已提速 2×,但异步预取等还没做)——本阶段目标是"**真的**在受限内存里跑起来且 token-exact",不是速度。
+- **完整引擎构建走 blade(面向 Unix)**,在 macOS/Linux 验证;Windows 目前只把**可移植 I/O 层**用真 MSVC(CI job)验证,完整 Windows 构建、以及 ggml 的 Metal/CUDA/Vulkan 后端尚未打通。
+- **引擎只支持 OLMoE 架构**(可作为接更多 MoE 的模板);但**缓存研究已跨架构**(OLMoE + granite-moe)。
 
 ---
 
@@ -171,6 +180,7 @@ src/
 - [`docs/ROADMAP.md`](docs/ROADMAP.md) — 分步实现计划(Master Issue #1),每个 PR 引用它
 - [`docs/dependencies.md`](docs/dependencies.md) — 第三方依赖账本(引入前先讨论)
 - [`docs/blade-feedback.md`](docs/blade-feedback.md) — dogfood blade-build 的真实反馈
+- [`docs/cross-arch-trace.md`](docs/cross-arch-trace.md) — 从别的 MoE(如 granite)导出路由 trace 做跨架构验证
 - [`bench-log.md`](bench-log.md) — 研究日志:命中率曲线、内存实测等硬数据
 
 ## License
