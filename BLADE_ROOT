@@ -11,6 +11,15 @@ cc_config(
     warnings = ['-Wall', '-Wextra', '-Werror'],
 )
 
+# 未定义符号检查升级为硬失败(默认只是 warning)。
+# PR#2 教训:vcpkg umbrella(libggml.a)漏链子库(base/cpu)时,blade 的静态
+# check_undefined 正确报了警,但 CI 的宽松链接器蒙混解析过去、侥幸跑绿,
+# 只有本地严格 ld64 才真失败。设为 error 让 CI 与严格链接器一致。(EXPERIMENTAL)
+cc_library_config(
+    check_undefined = True,
+    check_undefined_severity = 'error',
+)
+
 # gtest 自动注入:cc_test 无需显式依赖 gtest_main(见 thirdparty/googletest/BUILD)。
 cc_test_config(
     gtest_libs = lambda blade: ['thirdparty/googletest:gtest'] + (
@@ -27,5 +36,6 @@ vcpkg_config(
     baseline = '06a7fdd564234908731c59ac46a624f808e87b1c',
     packages = {
         'gtest': {'version': '1.17.0'},
+        'ggml': {'version': '0.11.1'},   # baseline 已含此版本,无需 bump;metal/cuda/vulkan 等 feature 留到 M4
     },
 )
