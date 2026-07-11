@@ -1,9 +1,0 @@
-source "https://rubygems.org"
-
-# 用 GitHub Actions 从本子目录构建 just-the-docs 站点(见 .github/workflows/pages.yml)。
-# 用 gem 主题(而非 remote_theme):just-the-docs 自动带上 seo-tag 等运行时依赖。
-gem "jekyll", "~> 4.3"
-gem "just-the-docs", "~> 0.10"
-gem "jekyll-seo-tag"
-gem "jekyll-include-cache"
-gem "webrick"   # jekyll 4 在 ruby 3 上需要

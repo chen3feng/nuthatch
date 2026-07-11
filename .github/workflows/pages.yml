@@ -1,5 +1,7 @@
 # 从 docs/analysis/ 构建 just-the-docs 站点并部署到 GitHub Pages。
-# 需在仓库 Settings → Pages → Source 选 "GitHub Actions"(本工作流也尝试自动启用)。
+# 用 GitHub 官方 jekyll-build-pages(内置 github-pages gem 全套:remote_theme /
+# seo-tag / include-cache),与其他代码分析站(colibri-analysis 等)同一套,样式一致。
+# 需在 Settings → Pages → Source 选 "GitHub Actions"。
 name: Deploy analysis site
 
 on:
@@ -15,7 +17,6 @@ permissions:
   pages: write
   id-token: write
 
-# 只允许一个并发部署。
 concurrency:
   group: pages
   cancel-in-progress: false
@@ -25,24 +26,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: '3.3'
-          bundler-cache: true
-          working-directory: docs/analysis
-      - name: Configure Pages
-        id: pages
+
+      # 分析文档里的源码引用是仓内相对路径(../../src/...);发布站上不存在这些路径,
+      # 构建前把它们改写成 GitHub blob 绝对链接(仅在 runner 的 checkout 上改,不动仓库)。
+      - name: Rewrite source links for Pages
+        run: |
+          cd docs/analysis
+          sed -i 's|](\.\./\.\./|](https://github.com/chen3feng/nuthatch/blob/main/|g' *.md
+
+      - name: Setup Pages
         uses: actions/configure-pages@v5
+
+      - name: Build with Jekyll
+        uses: actions/jekyll-build-pages@v1
         with:
-          enablement: true
-      - name: Jekyll build (source = docs/analysis)
-        working-directory: docs/analysis
-        run: bundle exec jekyll build --baseurl "${{ steps.pages.outputs.base_path }}"
-        env:
-          JEKYLL_ENV: production
+          source: docs/analysis
+
       - uses: actions/upload-pages-artifact@v3
-        with:
-          path: docs/analysis/_site
 
   deploy:
     needs: build
