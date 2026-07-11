@@ -45,7 +45,8 @@ ggml_tensor* BuildForward(ggml_context* ctx, const OlmoeModel& model,
 ggml_tensor* BuildForwardCached(ggml_context* ctx, const OlmoeModel& model,
                                 const KvCache& kv, ggml_tensor* token_ids,
                                 ggml_tensor* pos, bool norm_topk,
-                                std::vector<ggml_tensor*>* cache_writes) {
+                                std::vector<ggml_tensor*>* cache_writes,
+                                std::vector<ggml_tensor*>* selected_out) {
   const OlmoeConfig& cfg = model.config();
   const int n_past = kv.n_past();
 
@@ -71,7 +72,11 @@ ggml_tensor* BuildForwardCached(ggml_context* ctx, const OlmoeModel& model,
     mw.gate_exps = model.layer_tensor(l, "ffn_gate_exps.weight");
     mw.up_exps = model.layer_tensor(l, "ffn_up_exps.weight");
     mw.down_exps = model.layer_tensor(l, "ffn_down_exps.weight");
-    h = ggml_add(ctx, h, BuildMoe(ctx, cfg, mw, h, norm_topk));
+    ggml_tensor* selected = nullptr;
+    h = ggml_add(ctx, h,
+                 BuildMoe(ctx, cfg, mw, h, norm_topk,
+                          selected_out != nullptr ? &selected : nullptr));
+    if (selected_out != nullptr) selected_out->push_back(selected);
   }
 
   h = ggml_mul(ctx, ggml_rms_norm(ctx, h, cfg.rms_eps),

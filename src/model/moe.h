@@ -22,8 +22,13 @@ struct MoeWeights {
 //   → silu(gate)·up → down mul_mat_id → ×权重 → 各专家切片求和。
 // norm_topk:是否把 top-k 权重归一到和为 1(OLMoE 的精确取值在 P14 对拍时定)。
 // 数值正确性留 P14 整图对拍;本块单测只保证结构/形状/有限。
+//
+// selected_out(可选):非空时回填本层 top-k 选中的【全局专家 id】张量
+// [n_expert_used, T](I32)。P21 用它把真实推理的专家选择导成 RoutingTrace,
+// 喂给 M2 的缓存策略比命中率——不影响数值结果。
 ggml_tensor* BuildMoe(ggml_context* ctx, const OlmoeConfig& cfg,
-                      const MoeWeights& w, ggml_tensor* h, bool norm_topk);
+                      const MoeWeights& w, ggml_tensor* h, bool norm_topk,
+                      ggml_tensor** selected_out = nullptr);
 
 }  // namespace nuthatch
 

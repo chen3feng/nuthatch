@@ -129,6 +129,27 @@
 - 结论:KV cache 让 decode 从 O(T)/步 降到 O(1)/步(读缓存 K/V),既更快又避开了重算路径的大-T 脆弱性。正确性锚点 `CachedMatchesUncached` 单测护住。
 - 待办:每 decode 步仍重建 ggml_context(128MB init)——后续可复用预分配 compute buffer 进一步提速。
 
+### 2026-07-11 — ★ learned-pin 在【真实 OLMoE 推理】上赢 LRU/OS 6–9pp(P21)
+
+- 机器/模型:M4 Pro;OLMoE-1B-7B Instruct Q4_K_M。16 层、64 专家/层、选 8。
+- 方法:`olmoe_trace` 真实推理(prompt "Once upon a time" + 64 decode token)导出
+  路由 trace(1072 records = 68 token × 16 层,8576 次专家访问),用 M2 三策略在
+  **同一 trace、同一总预算**(budget/层 × 16 层)下重放比命中率。miss = 需读盘。
+- 结果(命中率):
+
+  | 预算/层 (占 64) | learned-pin | per-layer LRU | OS 全局页缓存 | learned 优势 |
+  |---|---|---|---|---|
+  | 8  (12.5%) | **32.7%** | 23.7% | 23.7% | **+9.1 pp** |
+  | 16 (25%)   | **54.3%** | 48.0% | 47.1% | +6.4 / +7.2 pp |
+  | 24 (37.5%) | **70.9%** | 62.1% | 61.8% | +8.8 / +9.1 pp |
+
+- 结论:**M2 的模拟结论在真实推理路径上复现**——即便 OLMoE 训练做了专家负载
+  均衡,真实使用仍有足够偏斜,把历史最热专家 pin 常驻稳定甩开 LRU/OS 6–9pp。
+  这是"用量学习的专家流式缓存"差异化的**真实证据**(非合成 trace)。
+- 复现:`olmoe_trace <model> 64 <budget/层> Once upon a time`。
+- 待办(可选工程):物理显存受限执行(真在槽上 mul_mat_id,省内存);更多 prompt/
+  更长序列的稳健性;pin/lru 配比与 budget 的完整曲线。
+
 ---
 
 ## 数据点追加模板

@@ -8,7 +8,10 @@
 #include "ggml.h"
 #include "gguf.h"
 #include "gtest/gtest.h"
+#include "src/cache/cache_policy.h"
+#include "src/cache/lru_policy.h"
 #include "src/model/olmoe_model.h"
+#include "src/trace/routing_trace.h"
 
 namespace nuthatch {
 namespace {
@@ -103,6 +106,41 @@ TEST(GenerateTest, CachedMatchesUncached) {
         GreedyGenerateCached(*model, prompt, 6, norm_topk);
     EXPECT_EQ(ref, cached) << "norm_topk=" << norm_topk;
   }
+
+  std::remove(path.c_str());
+}
+
+// 真实推理路由 trace:良构、可被 M2 缓存策略重放,且不改变生成结果。
+TEST(GenerateTest, CachedTraceWellFormedAndReplayable) {
+  const std::string path = WriteTinyOlmoe();
+  auto model = OlmoeModel::Load(path);
+  ASSERT_NE(model, nullptr);
+  const auto& cfg = model->config();
+
+  std::vector<int32_t> prompt = {3, 7, 2};
+  RoutingTrace tr;
+  std::vector<int32_t> gen =
+      GreedyGenerateCachedTrace(*model, prompt, /*n_predict=*/5, false, &tr);
+
+  // 带 trace 的生成与不带的逐 token 一致(trace 是旁路,不影响数值)。
+  EXPECT_EQ(gen, GreedyGenerateCached(*model, prompt, 5, false));
+
+  EXPECT_EQ(tr.n_layers, cfg.n_layers);
+  EXPECT_EQ(tr.n_expert, cfg.n_expert);
+  ASSERT_FALSE(tr.records.empty());
+  EXPECT_EQ(tr.records.size() % cfg.n_layers, 0u);  // 每 token 一整层栈
+
+  for (const RoutingRecord& r : tr.records) {
+    EXPECT_EQ(r.experts.size(), cfg.n_expert_used);
+    EXPECT_LT(r.layer, tr.n_layers);
+    for (uint32_t e : r.experts) EXPECT_LT(e, tr.n_expert);
+  }
+
+  // 现成的 M2 策略能直接重放这条真实 trace。
+  LruPolicy lru(tr.n_layers, /*slots_per_layer=*/2);
+  ReplayStats s = Replay(tr, &lru);
+  EXPECT_GT(s.accesses, 0u);
+  EXPECT_EQ(s.hits + s.misses, s.accesses);
 
   std::remove(path.c_str());
 }
