@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]   # windows 在 PR#16 加入
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python (blade 是 python 工具)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install ninja (blade 的构建后端)
+        uses: seanmiddleditch/gha-setup-ninja@v5
+
+      - name: Install blade-build
+        run: pip install blade-build
+
+      # blade 读 $VCPKG_ROOT;GitHub runner 预装了 vcpkg。
+      - name: Point blade at the runner's vcpkg
+        shell: bash
+        run: echo "VCPKG_ROOT=$VCPKG_INSTALLATION_ROOT" >> "$GITHUB_ENV"
+
+      - name: Build & test
+        run: blade test //...
