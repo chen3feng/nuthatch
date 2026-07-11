@@ -7,7 +7,7 @@
 
 | 库 | 用途 | 许可 | 哪个 PR | 状态 | 备注 |
 |---|---|---|---|---|---|
-| **ggml** | 张量 + k-quant 内核 + 多后端(CPU/Metal/CUDA/Vulkan)+ GGUF 读取(`gguf.h`) | MIT | #2 起 | **✅ 已同意** | 走 blade vcpkg:`vcpkg#ggml:ggml`(薄封装 `//thirdparty/ggml`)。**待定:vcpkg-pin(v0.11.1)还是本地源码取最新?** |
+| **ggml** | 张量 + k-quant 内核 + 多后端(CPU/Metal/CUDA/Vulkan)+ GGUF 读取(`gguf.h`) | MIT | #2 起 | **✅ 已同意** | 走 blade vcpkg:`vcpkg#ggml:ggml`(薄封装 `//thirdparty/ggml`),vcpkg pin v0.11.1。若日后需要更新架构支持再议切本地源码 |
 | **googletest** | 单测框架 | BSD-3 | #1 起 | **✅ 已同意** | 走 blade vcpkg:`vcpkg#gtest`(照 flare,pin 版本);`cc_test` 自动注入 gtest_main,不显式写 |
 | cpp-httplib | 可选 C++ HTTP server(单头、SSE) | MIT | #18(M5,可选) | **推迟** | 只有走"C++ 单体二进制"才需要;否则 HTTP 走 Python 网关 |
 | JSON 库(nlohmann/json?) | 若 C++ 侧要读/写 JSON | MIT | 待定 | **尽量避免** | GGUF 元数据走 ggml 的 gguf API,不需 JSON;配置尽量简单/自写。除非 M5 C++ server 需要 |
