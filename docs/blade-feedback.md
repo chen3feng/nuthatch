@@ -31,5 +31,6 @@
 
 ### 5. cc_check_undefined 是 warning,CI 侥幸绿(建议可配成硬失败)
 - **现象**:上面 #4 的未定义符号,blade 的 `cc_check_undefined` 在**本地和 CI 都报了警**——这是 blade 的**亮点**(静态抓出漏声明的 deps)。但它只是 warning:CI 的宽松链接器把符号蒙混解析过去、测试还跑绿了,而本地严格 `ld64` 才真失败。结果 CI "侥幸绿" = 不可信。
-- **期望**:提供一个开关把 `cc_check_undefined` 失败**升级为构建错误**(至少 CI 里),让 CI 与严格链接器一致。目前只看到 `allow_undefined` 白名单方向,没看到"变严格"的方向。
-- **状态**:待确认 blade 的配置开关(cc_config?),配上后加进 CI。
+- **期望**:提供一个开关把 `cc_check_undefined` 失败**升级为构建错误**,让 CI 与严格链接器一致。
+- **✅ 已解决**:开关是 `cc_library_config.check_undefined_severity`(默认 `'warning'`,设 `'error'` 即硬失败);已在 BLADE_ROOT 配上。本地双向验证过(修好则绿、故意砍回空壳 umbrella 则 error 失败)。
+- **给 blade 的建议**:文档强调"CI 里应设 `check_undefined_severity='error'`",或考虑把默认从 warning 改为 error(它默认 warning 会让 CI 侥幸绿)。
