@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "src/model/olmoe_model.h"
+#include "src/trace/routing_trace.h"
 
 namespace nuthatch {
 
@@ -22,6 +23,14 @@ std::vector<int32_t> GreedyGenerate(const OlmoeModel& model,
 std::vector<int32_t> GreedyGenerateCached(const OlmoeModel& model,
                                           std::vector<int32_t> ids,
                                           int n_predict, bool norm_topk);
+
+// 同 GreedyGenerateCached,并把每层每 token 选中的专家 id 导出到 *trace(按
+// token→layer 顺序追加 RoutingRecord)。这条【真实推理】trace 喂给 M2 的缓存
+// 策略(LRU/OS/learned-pin)重放,即得护城河证据:learned-pin 命中率更高。
+std::vector<int32_t> GreedyGenerateCachedTrace(const OlmoeModel& model,
+                                               std::vector<int32_t> ids,
+                                               int n_predict, bool norm_topk,
+                                               RoutingTrace* trace);
 
 }  // namespace nuthatch
 

@@ -28,10 +28,13 @@ ggml_tensor* BuildForward(ggml_context* ctx, const OlmoeModel& model,
 // 写新段(cpy 节点追加进 *cache_writes,调用方需 expand 进图)。位置从 kv->n_past()
 // 起。返回本步各位置的 logits [n_vocab, T]。逐层与 BuildForward 对应,
 // 故 prefill(n_past=0,喂整段 prompt)结果与 BuildForward 相同。
+// selected_out(可选):非空时按层序追加每层 MoE 选中的专家 id 张量
+// [n_expert_used, T](I32),供 P21 导出真实路由 trace。
 ggml_tensor* BuildForwardCached(ggml_context* ctx, const OlmoeModel& model,
                                 const KvCache& kv, ggml_tensor* token_ids,
                                 ggml_tensor* pos, bool norm_topk,
-                                std::vector<ggml_tensor*>* cache_writes);
+                                std::vector<ggml_tensor*>* cache_writes,
+                                std::vector<ggml_tensor*>* selected_out = nullptr);
 
 }  // namespace nuthatch
 

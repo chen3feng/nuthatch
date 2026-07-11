@@ -165,6 +165,7 @@ cc_library(
         ':forward',
         ':kv_cache',
         ':olmoe_model',
+        '//src/trace:routing_trace',  # 导出真实推理路由 trace
         '//thirdparty/ggml:ggml',
     ],
     visibility = ['PUBLIC'],
@@ -176,6 +177,9 @@ cc_test(
     deps = [
         ':generate',
         ':olmoe_model',
+        '//src/cache:cache_policy',   # Replay 真实 trace
+        '//src/cache:lru_policy',
+        '//src/trace:routing_trace',
         '//thirdparty/ggml:ggml',
     ],
 )
@@ -188,5 +192,21 @@ cc_binary(
         ':generate',
         ':olmoe_model',
         '//src/tokenizer:tokenizer',  # 解码生成文本
+    ],
+)
+
+# 护城河证据工具(CI 仅编译):真实推理导出路由 trace → 三策略比命中率。
+cc_binary(
+    name = 'olmoe_trace',
+    srcs = ['olmoe_trace_main.cc'],
+    deps = [
+        ':generate',
+        ':olmoe_model',
+        '//src/tokenizer:tokenizer',
+        '//src/trace:routing_trace',
+        '//src/cache:cache_policy',
+        '//src/cache:lru_policy',
+        '//src/cache:os_page_cache_policy',
+        '//src/cache:learned_pin_policy',
     ],
 )

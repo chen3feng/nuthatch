@@ -5,7 +5,8 @@
 namespace nuthatch {
 
 ggml_tensor* BuildMoe(ggml_context* ctx, const OlmoeConfig& cfg,
-                      const MoeWeights& w, ggml_tensor* h, bool norm_topk) {
+                      const MoeWeights& w, ggml_tensor* h, bool norm_topk,
+                      ggml_tensor** selected_out) {
   const int64_t n_embd = cfg.n_embd;
   const int64_t n_expert = cfg.n_expert;
   const int64_t n_used = cfg.n_expert_used;
@@ -21,6 +22,7 @@ ggml_tensor* BuildMoe(ggml_context* ctx, const OlmoeConfig& cfg,
   // 选 top-k 专家 id。
   ggml_tensor* selected =
       ggml_argsort_top_k(ctx, probs, n_used);  // [n_used, T] (I32)
+  if (selected_out != nullptr) *selected_out = selected;  // P21 路由 trace
 
   // 取选中专家的权重:get_rows 在 [1, n_expert, T] 上按 id 取。
   ggml_tensor* probs3 = ggml_reshape_3d(ctx, probs, 1, n_expert, n_tokens);
