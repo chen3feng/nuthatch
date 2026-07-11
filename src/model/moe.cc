@@ -1,5 +1,7 @@
 #include "src/model/moe.h"
 
+#include <cmath>  // INFINITY(Linux/gcc 不会像 macOS 那样间接引入)
+
 namespace nuthatch {
 
 ggml_tensor* BuildMoe(ggml_context* ctx, const OlmoeConfig& cfg,
