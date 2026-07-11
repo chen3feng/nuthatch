@@ -58,6 +58,28 @@ cc_test(
     ],
 )
 
+# 单序列 KV cache:每层常驻 K/V 缓存张量,跨 decode 步存活。
+cc_library(
+    name = 'kv_cache',
+    srcs = ['kv_cache.cc'],
+    hdrs = ['kv_cache.h'],
+    deps = [
+        ':olmoe_model',            # OlmoeConfig
+        '//thirdparty/ggml:ggml',
+    ],
+    visibility = ['PUBLIC'],
+)
+
+cc_test(
+    name = 'kv_cache_test',
+    srcs = ['kv_cache_test.cc'],
+    deps = [
+        ':kv_cache',
+        ':olmoe_model',
+        '//thirdparty/ggml:ggml',
+    ],
+)
+
 cc_library(
     name = 'forward',
     srcs = ['forward.cc'],
@@ -66,6 +88,7 @@ cc_library(
         ':olmoe_model',
         ':attention',
         ':moe',
+        ':kv_cache',
         '//thirdparty/ggml:ggml',
     ],
     visibility = ['PUBLIC'],
@@ -98,6 +121,7 @@ cc_library(
     hdrs = ['generate.h'],
     deps = [
         ':forward',
+        ':kv_cache',
         ':olmoe_model',
         '//thirdparty/ggml:ggml',
     ],

@@ -90,5 +90,22 @@ TEST(GenerateTest, GreedyDeterministicInVocab) {
   std::remove(path.c_str());
 }
 
+// KV cache 正确性锚点:带缓存生成必须与不带缓存逐 token 一致。
+TEST(GenerateTest, CachedMatchesUncached) {
+  const std::string path = WriteTinyOlmoe();
+  auto model = OlmoeModel::Load(path);
+  ASSERT_NE(model, nullptr);
+
+  std::vector<int32_t> prompt = {3, 7, 2, 5};
+  for (bool norm_topk : {false, true}) {
+    std::vector<int32_t> ref = GreedyGenerate(*model, prompt, /*n_predict=*/6, norm_topk);
+    std::vector<int32_t> cached =
+        GreedyGenerateCached(*model, prompt, 6, norm_topk);
+    EXPECT_EQ(ref, cached) << "norm_topk=" << norm_topk;
+  }
+
+  std::remove(path.c_str());
+}
+
 }  // namespace
 }  // namespace nuthatch

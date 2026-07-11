@@ -42,4 +42,41 @@ ggml_tensor* BuildForward(ggml_context* ctx, const OlmoeModel& model,
   return ggml_mul_mat(ctx, model.tensor("output.weight"), h);  // [n_vocab, T]
 }
 
+ggml_tensor* BuildForwardCached(ggml_context* ctx, const OlmoeModel& model,
+                                const KvCache& kv, ggml_tensor* token_ids,
+                                ggml_tensor* pos, bool norm_topk,
+                                std::vector<ggml_tensor*>* cache_writes) {
+  const OlmoeConfig& cfg = model.config();
+  const int n_past = kv.n_past();
+
+  ggml_tensor* h =
+      ggml_get_rows(ctx, model.tensor("token_embd.weight"), token_ids);
+
+  for (int l = 0; l < static_cast<int>(cfg.n_layers); ++l) {
+    AttnWeights aw;
+    aw.attn_norm = model.layer_tensor(l, "attn_norm.weight");
+    aw.wq = model.layer_tensor(l, "attn_q.weight");
+    aw.wk = model.layer_tensor(l, "attn_k.weight");
+    aw.wv = model.layer_tensor(l, "attn_v.weight");
+    aw.q_norm = model.layer_tensor(l, "attn_q_norm.weight");
+    aw.k_norm = model.layer_tensor(l, "attn_k_norm.weight");
+    aw.wo = model.layer_tensor(l, "attn_output.weight");
+    h = ggml_add(ctx, h,
+                 BuildAttentionCached(ctx, cfg, aw, h, pos, kv.k(l), kv.v(l),
+                                      n_past, cache_writes));
+
+    MoeWeights mw;
+    mw.ffn_norm = model.layer_tensor(l, "ffn_norm.weight");
+    mw.router = model.layer_tensor(l, "ffn_gate_inp.weight");
+    mw.gate_exps = model.layer_tensor(l, "ffn_gate_exps.weight");
+    mw.up_exps = model.layer_tensor(l, "ffn_up_exps.weight");
+    mw.down_exps = model.layer_tensor(l, "ffn_down_exps.weight");
+    h = ggml_add(ctx, h, BuildMoe(ctx, cfg, mw, h, norm_topk));
+  }
+
+  h = ggml_mul(ctx, ggml_rms_norm(ctx, h, cfg.rms_eps),
+               model.tensor("output_norm.weight"));
+  return ggml_mul_mat(ctx, model.tensor("output.weight"), h);
+}
+
 }  // namespace nuthatch
