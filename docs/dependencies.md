@@ -11,6 +11,7 @@
 | **googletest** | 单测框架 | BSD-3 | #1 起 | **✅ 已同意** | 走 blade vcpkg:`vcpkg#gtest`(照 flare,pin 版本);`cc_test` 自动注入 gtest_main,不显式写 |
 | cpp-httplib | 可选 C++ HTTP server(单头、SSE) | MIT | #18(M5,可选) | **推迟** | 只有走"C++ 单体二进制"才需要;否则 HTTP 走 Python 网关 |
 | JSON 库(nlohmann/json?) | 若 C++ 侧要读/写 JSON | MIT | 待定 | **尽量避免** | GGUF 元数据走 ggml 的 gguf API,不需 JSON;配置尽量简单/自写。除非 M5 C++ server 需要 |
+| **PCRE2** | tokenizer 编码的 OLMo 预分词正则 | BSD-3 | #17 | **✅ 已同意(用户批准)** | vcpkg`vcpkg#pcre2:pcre2` v10.47。选它而非 RE2:PCRE2 同时支持 `\p{L}`/`\p{N}` **和前瞻 `(?!\S)`**(能跑完整正则),且 **self-contained 无 abseil**(RE2 新版拖 abseil→macOS CoreFoundation 链接坑)。避免手写 ~440 行 Unicode 表 |
 
 ## Python 工具依赖(`tools/`,不进运行时)
 
