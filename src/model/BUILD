@@ -58,6 +58,30 @@ cc_test(
     ],
 )
 
+# 显存受限加载:非专家权重常驻,专家张量交给 ExpertReader 流式(真省内存)。
+cc_library(
+    name = 'streaming_model',
+    srcs = ['streaming_model.cc'],
+    hdrs = ['streaming_model.h'],
+    deps = [
+        ':expert_reader',
+        ':olmoe_model',            # OlmoeConfig + ParseOlmoeConfig
+        '//thirdparty/ggml:ggml',
+    ],
+    visibility = ['PUBLIC'],
+)
+
+cc_test(
+    name = 'streaming_model_test',
+    srcs = ['streaming_model_test.cc'],
+    deps = [
+        ':streaming_model',
+        ':expert_reader',
+        ':olmoe_model',
+        '//thirdparty/ggml:ggml',
+    ],
+)
+
 # 专家流式读取器:按 (张量名, expert_idx) 从 GGUF pread 出单个专家的量化字节。
 cc_library(
     name = 'expert_reader',
