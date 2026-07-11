@@ -36,3 +36,24 @@ cc_test(
         '//thirdparty/ggml:ggml',
     ],
 )
+
+cc_library(
+    name = 'moe',
+    srcs = ['moe.cc'],
+    hdrs = ['moe.h'],
+    deps = [
+        ':olmoe_model',
+        '//thirdparty/ggml:ggml',
+    ],
+    visibility = ['PUBLIC'],
+)
+
+cc_test(
+    name = 'moe_test',
+    srcs = ['moe_test.cc'],
+    deps = [
+        ':moe',
+        ':olmoe_model',
+        '//thirdparty/ggml:ggml',
+    ],
+)
