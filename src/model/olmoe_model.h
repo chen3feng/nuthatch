@@ -31,6 +31,10 @@ struct OlmoeConfig {
   uint32_t head_dim() const { return n_head ? n_embd / n_head : 0; }
 };
 
+// 从 GGUF 元数据 + 张量形状解析架构参数(常驻 / 流式两种 loader 共用)。
+// tensors 是承载(至少形状的)张量的 ctx——n_vocab 由 output.weight 的 ne[1] 推。
+OlmoeConfig ParseOlmoeConfig(gguf_context* g, ggml_context* tensors);
+
 // 加载 OLMoE 模型:读 config,并把【全部权重张量常驻】进一个 ggml_context
 // (no_alloc=false)。这是"先常驻、后流式"的第一步——先让引擎能跑通前向,
 // 之后再把专家换成流式 backend buffer(M3 后半)。

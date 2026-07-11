@@ -28,13 +28,7 @@ std::string ReadStr(gguf_context* g, const std::string& key) {
 
 }  // namespace
 
-std::unique_ptr<OlmoeModel> OlmoeModel::Load(const std::string& path) {
-  ggml_context* ctx = nullptr;
-  // no_alloc=false:把张量数据也加载进 ctx(常驻)。
-  gguf_init_params p = {/*no_alloc=*/false, /*ctx=*/&ctx};
-  gguf_context* g = gguf_init_from_file(path.c_str(), p);
-  if (g == nullptr) return nullptr;
-
+OlmoeConfig ParseOlmoeConfig(gguf_context* g, ggml_context* tensors) {
   // 用 general.architecture 作为超参 key 前缀(如 "olmoe.block_count")。
   std::string arch = ReadStr(g, "general.architecture");
   if (arch.empty()) arch = "olmoe";
@@ -52,18 +46,27 @@ std::unique_ptr<OlmoeModel> OlmoeModel::Load(const std::string& path) {
   cfg.rope_freq_base = ReadF32(g, K("rope.freq_base"), 10000.0f);
   cfg.rms_eps = ReadF32(g, K("attention.layer_norm_rms_epsilon"), 1e-5f);
 
+  // n_vocab 从 output.weight(退化到 token_embd.weight)的 ne[1] 推。
+  ggml_tensor* out = ggml_get_tensor(tensors, "output.weight");
+  if (out == nullptr) out = ggml_get_tensor(tensors, "token_embd.weight");
+  if (out != nullptr) cfg.n_vocab = static_cast<uint32_t>(out->ne[1]);
+  return cfg;
+}
+
+std::unique_ptr<OlmoeModel> OlmoeModel::Load(const std::string& path) {
+  ggml_context* ctx = nullptr;
+  // no_alloc=false:把张量数据也加载进 ctx(常驻)。
+  gguf_init_params p = {/*no_alloc=*/false, /*ctx=*/&ctx};
+  gguf_context* g = gguf_init_from_file(path.c_str(), p);
+  if (g == nullptr) return nullptr;
+
+  const OlmoeConfig cfg = ParseOlmoeConfig(g, ctx);
+
   // name -> tensor 映射(ctx 里的所有张量)。
   std::unordered_map<std::string, ggml_tensor*> tensors;
   for (ggml_tensor* t = ggml_get_first_tensor(ctx); t != nullptr;
        t = ggml_get_next_tensor(ctx, t)) {
     tensors[ggml_get_name(t)] = t;
-  }
-
-  // n_vocab 从 output.weight(退化到 token_embd.weight)的 ne[1] 推。
-  if (auto it = tensors.find("output.weight"); it != tensors.end()) {
-    cfg.n_vocab = static_cast<uint32_t>(it->second->ne[1]);
-  } else if (auto it = tensors.find("token_embd.weight"); it != tensors.end()) {
-    cfg.n_vocab = static_cast<uint32_t>(it->second->ne[1]);
   }
 
   return std::unique_ptr<OlmoeModel>(
