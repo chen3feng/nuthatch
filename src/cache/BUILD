@@ -65,3 +65,37 @@ cc_test(
         '//src/trace:routing_trace',
     ],
 )
+
+# budget 扫描:同一 trace、同一总预算比三策略命中率(隔离变量看曲线)。
+cc_library(
+    name = 'trace_sweep',
+    srcs = ['trace_sweep.cc'],
+    hdrs = ['trace_sweep.h'],
+    deps = [
+        ':cache_policy',
+        ':lru_policy',
+        ':os_page_cache_policy',
+        ':learned_pin_policy',
+        '//src/trace:routing_trace',
+    ],
+    visibility = ['PUBLIC'],
+)
+
+cc_test(
+    name = 'trace_sweep_test',
+    srcs = ['trace_sweep_test.cc'],
+    deps = [
+        ':trace_sweep',
+        '//src/trace:routing_trace',
+    ],
+)
+
+# model-free 曲线工具:读 trace 文件扫 budget 比命中率(秒级,不重载模型)。
+cc_binary(
+    name = 'trace_replay',
+    srcs = ['trace_replay_main.cc'],
+    deps = [
+        ':trace_sweep',
+        '//src/trace:routing_trace',
+    ],
+)
