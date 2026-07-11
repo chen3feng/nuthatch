@@ -1,0 +1,14 @@
+[
+  {
+    "allow_file": "build_release/src/util/libversion.a.allow",
+    "dep_syms": [],
+    "sys_caches": [
+      "build_release/.cache/system-symbols/System.syms",
+      "build_release/.cache/system-symbols/c++.syms",
+      "build_release/.cache/system-symbols/c++abi.syms",
+      "build_release/.cache/system-symbols/libclang_rt.osx.a_9e58ed3d.syms"
+    ],
+    "target_label": "src/util:version",
+    "target_syms": "build_release/src/util/libversion.a.syms"
+  }
+]

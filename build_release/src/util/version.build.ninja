@@ -1,0 +1,15 @@
+#Fingerprint=78721a736c2b3b2617da85c2dd26556b
+
+build build_release/src/util/version.objs/version.cc.o | build_release/src/util/version.objs/version.cc.incstk: cxx src/util/version.cc
+  inclusion_stack = build_release/src/util/version.objs/version.cc.incstk
+
+build build_release/src/util/version.objs/version.h.incstk: cxxhdrs src/util/version.h
+
+build build_release/src/util/version.incchk.result: ccincchk build_release/src/util/version.incchk | build_release/src/util/version.objs/version.h.incstk build_release/src/util/version.objs/version.cc.incstk
+
+build build_release/src/util/libversion.a: ar build_release/src/util/version.objs/version.cc.o || build_release/src/util/version.incchk.result
+
+build build_release/src/util/libversion.a.syms: ccsyms build_release/src/util/libversion.a
+
+build build_release/src/util/version.__outputs__: phony build_release/src/util/libversion.a build_release/src/util/libversion.a.syms build_release/src/util/version.incchk.result
+

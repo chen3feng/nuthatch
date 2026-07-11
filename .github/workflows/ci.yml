@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]   # windows 在 PR#16 加入
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python (blade 是 python 工具)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install ninja (blade 的构建后端)
+        uses: seanmiddleditch/gha-setup-ninja@v5
+
+      # blade 不在 PyPI:从源码 clone,把它的启动脚本目录加进 PATH。
+      - name: Install blade-build
+        shell: bash
+        run: |
+          git clone --depth 1 https://github.com/chen3feng/blade-build.git "$HOME/blade-build"
+          echo "$HOME/blade-build" >> "$GITHUB_PATH"
+
+      # runner 自带的 vcpkg 太旧,ports/版本库与 BLADE_ROOT pin 的 baseline 不一致;
+      # fetch+checkout 该 commit,让 versions/ports 与 baseline 对齐(照 flare 的做法)。
+      - name: Pin vcpkg to the baseline
+        shell: bash
+        run: |
+          VCPKG_DIR="${VCPKG_INSTALLATION_ROOT:-/usr/local/share/vcpkg}"
+          git -C "$VCPKG_DIR" fetch --depth 1 origin 06a7fdd564234908731c59ac46a624f808e87b1c
+          git -C "$VCPKG_DIR" checkout -f 06a7fdd564234908731c59ac46a624f808e87b1c
+          echo "VCPKG_ROOT=$VCPKG_DIR" >> "$GITHUB_ENV"
+
+      - name: Build & test
+        run: blade test //...

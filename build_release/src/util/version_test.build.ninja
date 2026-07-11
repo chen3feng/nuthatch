@@ -1,0 +1,12 @@
+#Fingerprint=d7e26acff56a58a515a7d2d55a3f6d8d
+
+build build_release/src/util/version_test.objs/version_test.cc.o | build_release/src/util/version_test.objs/version_test.cc.incstk: cxx src/util/version_test.cc
+  includes = -isystem/Volumes/code/personal/nuthatch/build_release/.cache/vcpkg/installed/blade-arm64-osx/include
+  inclusion_stack = build_release/src/util/version_test.objs/version_test.cc.incstk
+
+build build_release/src/util/version_test.incchk.result: ccincchk build_release/src/util/version_test.incchk | build_release/src/util/version_test.objs/version_test.cc.incstk
+
+build build_release/src/util/version_test: link build_release/src/util/version_test.objs/version_test.cc.o build_release/src/util/libversion.a /Volumes/code/personal/nuthatch/build_release/.cache/vcpkg/installed/blade-arm64-osx/lib/libgtest_main.a /Volumes/code/personal/nuthatch/build_release/.cache/vcpkg/installed/blade-arm64-osx/lib/libgtest.a || build_release/thirdparty/googletest/gtest_main.incchk.result build_release/thirdparty/googletest/gtest.incchk.result build_release/src/util/version_test.incchk.result
+
+build build_release/src/util/version_test.__outputs__: phony build_release/src/util/version_test build_release/src/util/version_test.incchk.result
+

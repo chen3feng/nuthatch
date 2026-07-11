@@ -1,0 +1,31 @@
+# nuthatch — blade 构建根配置。参照 Tencent/flare 的实践简化而来。
+# blade-build: https://github.com/chen3feng/blade-build
+
+global_config(
+    test_timeout = 120,                 # 单个测试超时(秒)
+    duplicated_source_action = 'error',
+)
+
+cc_config(
+    cxxflags = ['-std=gnu++20'],
+    warnings = ['-Wall', '-Wextra', '-Werror'],
+)
+
+# gtest 自动注入:cc_test 无需显式依赖 gtest_main(见 thirdparty/googletest/BUILD)。
+cc_test_config(
+    gtest_libs = lambda blade: ['thirdparty/googletest:gtest'] + (
+        ['#pthread'] if blade.cc_toolchain.target_os == 'linux' else []),
+    gtest_main_libs = ['thirdparty/googletest:gtest_main'],
+)
+
+# 第三方库经 vcpkg 引入;consumers 用 //thirdparty/X:Y(那些 BUILD 是
+# vcpkg#port:lib 的薄封装)。root 不写死:blade 读 $VCPKG_ROOT,或 PATH 上的
+# vcpkg(CI 用 runner 预装的 vcpkg)。
+# baseline 暂用 flare 同款(确定含 gtest 1.17.0);PR#2 引入 ggml 时,若该
+# baseline 无 ggml 0.11.1,再在那个 PR 里 bump baseline。
+vcpkg_config(
+    baseline = '06a7fdd564234908731c59ac46a624f808e87b1c',
+    packages = {
+        'gtest': {'version': '1.17.0'},
+    },
+)
