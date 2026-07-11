@@ -214,6 +214,27 @@
   输出不变、parity(StreamingMatchesResident)仍逐 token 一致。
 - 未做(后续):批量/异步预取(miss 的磁盘读与 compute 重叠)、减少每 token 图趟数。
 
+### 2026-07-11 — ★ 跨架构验证:learned 在 granite3-moe 上同样赢(P30)
+
+- 动机:护城河结论不该是 OLMoE 专属。换一个**完全不同**的 MoE 架构验证。
+- 模型:IBM **granite3-moe:1b**(`ollama pull`,~821MB,arch=granitemoe,**24 层 /
+  32 专家 / 选 8**——与 OLMoE 的 16 层 / 64 专家迥异)。
+- 方法:给 llama.cpp 的 eval-callback 打补丁,dump `ffn_moe_topk`(每层选中专家)成
+  文本 trace(1629 records);nuthatch `trace_replay --text` 重放比三策略。**不把
+  granite 跑进 nuthatch 引擎**——只验证缓存结论。提取法见 `docs/cross-arch-trace.md`,
+  trace 附在 `data/granite3moe.trace.txt`。
+- 结果:
+
+  | 预算/层 (占 32) | learned | LRU | OS | learned−LRU |
+  |---|---|---|---|---|
+  | 4  (12.5%) | **22.4%** | 4.7% | 0.0% | **+17.7 pp** |
+  | 8  (25%)   | **40.1%** | 30.4% | 30.2% | +9.7 pp |
+  | 12 (37.5%) | **56.7%** | 47.7% | 45.2% | +9.0 pp |
+  | 16 (50%)   | **71.6%** | 62.7% | 61.5% | +8.8 pp |
+
+- 结论:**与 OLMoE 同规律**——learned 稳定赢 +8.8~17.7pp,预算越紧优势越大
+  (12.5% 时 OS 塌到 0%)。**护城河跨架构成立,非 OLMoE 专属。**
+
 ---
 
 ## 数据点追加模板

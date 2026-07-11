@@ -28,6 +28,11 @@ bool WriteRoutingTrace(const RoutingTrace& trace, const std::string& path);
 // 读:成功填充 *out 并返回 true;文件缺失/魔数错/版本错/截断/损坏返回 false。
 bool ReadRoutingTrace(const std::string& path, RoutingTrace* out);
 
+// 读【文本】trace:每行 "<layer> e0 e1 ...",由外部工具(如打了补丁的 llama.cpp
+// eval-callback)导出,用于跨架构验证缓存策略。n_layers/n_expert 由内容推断
+// (max+1)。成功(至少一条记录)返回 true。
+bool ReadRoutingTraceText(const std::string& path, RoutingTrace* out);
+
 }  // namespace nuthatch
 
 #endif  // NUTHATCH_TRACE_ROUTING_TRACE_H_
