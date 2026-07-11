@@ -57,3 +57,37 @@ cc_test(
         '//thirdparty/ggml:ggml',
     ],
 )
+
+cc_library(
+    name = 'forward',
+    srcs = ['forward.cc'],
+    hdrs = ['forward.h'],
+    deps = [
+        ':olmoe_model',
+        ':attention',
+        ':moe',
+        '//thirdparty/ggml:ggml',
+    ],
+    visibility = ['PUBLIC'],
+)
+
+cc_test(
+    name = 'forward_test',
+    srcs = ['forward_test.cc'],
+    deps = [
+        ':forward',
+        ':olmoe_model',
+        '//thirdparty/ggml:ggml',
+    ],
+)
+
+# 本地调试:在真 OLMoE 上跑前向看 logits(CI 不跑,仅编译)。
+cc_binary(
+    name = 'olmoe_forward',
+    srcs = ['olmoe_forward_main.cc'],
+    deps = [
+        ':forward',
+        ':olmoe_model',
+        '//thirdparty/ggml:ggml',
+    ],
+)
